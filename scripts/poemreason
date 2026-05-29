@@ -86,18 +86,26 @@ def parse_poem_input(source):
     return {"title": "Untitled", "form": "cancao", "stanzas": stanzas}
 
 
-def analyze_poem(poem_data, output_format, html_output=None):
-    """Analyze a poem using the Prolog pipeline."""
-    title = poem_data.get("title", "Untitled")
-    form = poem_data.get("form", "cancao")
-    stanzas = poem_data["stanzas"]
-
-    # Build Prolog stanza list
+def build_stanzas_prolog(stanzas):
+    """Convert Python stanzas to a Prolog list-of-lists term."""
     stanza_terms = []
     for stanza in stanzas:
         verses = ", ".join(f'"{v}"' for v in stanza)
         stanza_terms.append(f"[{verses}]")
-    stanzas_prolog = "[" + ", ".join(stanza_terms) + "]"
+    return "[" + ", ".join(stanza_terms) + "]"
+
+
+def analyze_poem(poem_data, output_format, html_output=None, stdout_analysis=True):
+    """Analyze a poem using the Prolog pipeline."""
+    title = poem_data.get("title", "Untitled")
+    form = poem_data.get("form", "cancao")
+    stanzas = poem_data["stanzas"]
+    stanzas_prolog = build_stanzas_prolog(stanzas)
+
+    # If only HTML requested, skip stdout analysis
+    if html_output and not stdout_analysis:
+        generate_html(poem_data, html_output)
+        return
 
     tmp = None
     try:
@@ -110,14 +118,15 @@ def analyze_poem(poem_data, output_format, html_output=None):
         tmp.write(":- use_module(library(http/json)).\n")
         tmp.close()
 
-        # Build goal: extract features for each verse and output JSON
+        # Build goal: extract features for each verse and output JSON (compact, one per line)
         goal = (
             f"Estrofes = {stanzas_prolog}, "
             f"forall(member(Est, Estrofes), "
             f"  forall(member(Txt, Est), "
             f"    (verso_ln(Txt, ln(_, IPA, Cont, Classe)), "
             f"     json_write_dict(current_output, "
-            f"       _{{verso: Txt, ipa: IPA, silabas: Cont, rima: Classe}}), nl))), "
+            f"       _{{verso: Txt, ipa: IPA, silabas: Cont, rima: Classe}}, "
+            f"       [width(0)]), nl))), "
             f"halt"
         )
 
@@ -268,14 +277,19 @@ def main():
 
     args = parser.parse_args()
 
+    # Show stdout analysis unless --html is the only output requested
+    # (i.e., user didn't explicitly ask for -f table or -f json)
+    explicit_format = any(a in sys.argv for a in ["-f", "--format"])
+    stdout_analysis = explicit_format or not args.html
+
     if args.example is not False:
         run_example(args.example)
     elif args.input:
         poem = parse_poem_input(args.input)
-        analyze_poem(poem, args.format, args.html)
+        analyze_poem(poem, args.format, args.html, stdout_analysis)
     elif not sys.stdin.isatty():
         poem = parse_poem_input("-")
-        analyze_poem(poem, args.format, args.html)
+        analyze_poem(poem, args.format, args.html, stdout_analysis)
     else:
         parser.print_help()
         sys.exit(1)
