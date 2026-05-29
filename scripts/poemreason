@@ -12,6 +12,7 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.dirname(SCRIPT_DIR)
 RULES_DIR = os.path.join(PROJECT_ROOT, "rules")
 TESTS_DIR = os.path.join(PROJECT_ROOT, "tests")
+TMP_DIR = os.path.join(PROJECT_ROOT, "tmp")
 
 
 def find_swipl():
@@ -110,7 +111,7 @@ def analyze_poem(poem_data, output_format, html_output=None, stdout_analysis=Tru
     tmp = None
     try:
         tmp = tempfile.NamedTemporaryFile(
-            mode="w", suffix=".pl", dir=RULES_DIR, prefix="analyze_", delete=False
+            mode="w", suffix=".pl", dir=TMP_DIR, prefix="analyze_", delete=False
         )
         tmp.write(":- encoding(utf8).\n")
         tmp.write(":- use_module(pipeline).\n")
@@ -190,7 +191,7 @@ def generate_html(poem_data, output_path):
     tmp = None
     try:
         tmp = tempfile.NamedTemporaryFile(
-            mode="w", suffix=".pl", dir=RULES_DIR, prefix="html_", delete=False
+            mode="w", suffix=".pl", dir=TMP_DIR, prefix="html_", delete=False
         )
         tmp.write(":- encoding(utf8).\n")
         tmp.write(":- use_module(pipeline).\n")

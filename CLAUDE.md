@@ -52,6 +52,8 @@ swipl -q -s rules/structural_validator.pl \
 ### Artifacts and directories
 - All file names, directory names, module names, predicate names, variable names, and any other code identifiers **must be in English**.
 - Commit messages and branch names must be in English.
+- Poem files in `poems/` follow the naming convention `<author>_<year>_<title>.md` and **must be UTF-8 encoded** (multilingual support: Portuguese, Japanese, etc.).
+- Poem `.md` files start with `# Title — Author (Year)` on the first line.
 
 ### Interaction
 - Conversation with the user may be in **Brazilian Portuguese** or **English** — follow the user's lead.
