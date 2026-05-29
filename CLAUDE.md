@@ -44,9 +44,10 @@ swipl -q -s rules/core.pl -g "aprovar_credito(joao, V), format('~w~n', [V]), hal
 - Conversation with the user may be in **Brazilian Portuguese** or **English** — follow the user's lead.
 
 ### Documentation
-- Documentation (README, CLAUDE.md, inline comments, docstrings) should preferably be in **English**.
-- Bilingual documentation (English + Brazilian Portuguese) is acceptable when clarity for the team requires it.
-- Code comments explaining business rules specific to a Brazilian domain context may be in Portuguese if that improves understanding.
+- Documentation (README, CLAUDE.md, file-header comments, docstrings) **must be bilingual**: English first (general audience), Brazilian Portuguese second (domain precision).
+- Rationale: the MVP focuses on Lusophone poets, and the domain vocabulary (escansão, sinalefa, cauda consonante, ictus, paroxítona, etc.) carries technical meaning that loses precision in translation. Bilingual prose anchors the domain for native readers while keeping the POC readable for the international audience this public repo also serves.
+- Inline comments explaining a Brazilian Portuguese phonetic, prosodic, or domain rule may be in Portuguese alone when that improves clarity.
+- Identifiers, file/directory names, commit messages, branch names, PR titles, and CLI output remain **English-only** (see "Artifacts and directories" above).
 
 ## Conventions
 
