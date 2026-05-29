@@ -59,4 +59,4 @@ All changes to `main` must go through a Pull Request. See [CLAUDE.md](CLAUDE.md)
 
 ## License
 
-This project is currently unlicensed. All rights reserved.
+This project is licensed under the [MIT License](LICENSE).
