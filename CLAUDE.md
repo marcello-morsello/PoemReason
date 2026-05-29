@@ -74,6 +74,10 @@ swipl -q -s rules/core.pl -g "aprovar_credito(joao, V), format('~w~n', [V]), hal
   swipl -q -s tests/credit_tests.pl -g "run_tests, halt" -t "halt(1)"
   ```
 
+## Environment check
+Run `scripts/check_env.sh` to verify all required tools are installed.
+It detects the OS (macOS/Linux/Windows) and prints install commands for any missing tool.
+
 ## Common tasks
 - **Add a rule**: edit `rules/core.pl`, run the corresponding test.
 - **Debug**: use `trace, GOAL` in an interactive session (`swipl rules/core.pl`).
