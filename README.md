@@ -9,9 +9,14 @@ A deterministic rules engine powered by [SWI-Prolog](https://www.swi-prolog.org/
 ## Project structure
 
 ```
-rules/          Prolog rule modules
-tests/          plunit test files
-CLAUDE.md       AI assistant conventions and project guidelines
+rules/
+├── clients.pl      Client facts (cliente/4)
+└── core.pl         Decision rules and JSON output
+tests/
+└── credit_tests.pl plunit tests for credit approval
+CLAUDE.md           AI assistant conventions and project guidelines
+LICENSE             MIT license
+README.md           This file
 ```
 
 ## Quick start
