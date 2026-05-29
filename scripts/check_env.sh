@@ -47,10 +47,16 @@ pkg_name() {
                 linux)   echo "git";;
                 windows) echo "Git.Git";;
             esac;;
+        python3)
+            case "$OS" in
+                macos)   echo "python3";;
+                linux)   echo "python3";;
+                windows) echo "Python.Python.3";;
+            esac;;
     esac
 }
 
-REQUIRED_TOOLS=(git swipl gh)
+REQUIRED_TOOLS=(git swipl gh python3)
 missing=0
 
 for tool in "${REQUIRED_TOOLS[@]}"; do
