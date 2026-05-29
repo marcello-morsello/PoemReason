@@ -71,8 +71,46 @@ for tool in "${REQUIRED_TOOLS[@]}"; do
 done
 
 echo "---"
+
+# Check Python venv and pip dependencies
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+VENV_DIR="$PROJECT_ROOT/.venv"
+REQUIREMENTS="$PROJECT_ROOT/requirements.txt"
+
+if [ ! -d "$VENV_DIR" ]; then
+    echo "MISSING  .venv (Python virtual environment)"
+    echo "  python3 -m venv .venv && .venv/bin/pip install -r requirements.txt"
+    missing=$((missing + 1))
+else
+    echo "OK  .venv"
+    VENV_PYTHON="$VENV_DIR/bin/python3"
+    if [ -f "$REQUIREMENTS" ]; then
+        while IFS= read -r line || [ -n "$line" ]; do
+            # Skip empty lines and comments
+            line="$(echo "$line" | sed 's/#.*//' | xargs)"
+            [ -z "$line" ] && continue
+            # Extract package name (strip version specifiers) and map to import name
+            pkg="$(echo "$line" | sed 's/[><=!].*//')"
+            case "$pkg" in
+                pyyaml) import_name="yaml";;
+                *)      import_name="$pkg";;
+            esac
+            if "$VENV_PYTHON" -c "import importlib; importlib.import_module('$import_name')" 2>/dev/null; then
+                version=$("$VENV_PYTHON" -c "import $import_name; print(getattr($import_name, '__version__', 'installed'))" 2>/dev/null)
+                echo "OK  pip: $pkg ($version)"
+            else
+                echo "MISSING  pip: $pkg"
+                echo "  .venv/bin/pip install -r requirements.txt"
+                missing=$((missing + 1))
+            fi
+        done < "$REQUIREMENTS"
+    fi
+fi
+
+echo "---"
 if [ "$missing" -gt 0 ]; then
-    echo "$missing tool(s) missing. Install them and re-run this script."
+    echo "$missing item(s) missing. Install them and re-run this script."
     exit 1
 else
     echo "All tools available."
