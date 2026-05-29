@@ -1,0 +1,268 @@
+#!/usr/bin/env python3
+"""PoemReason CLI — run Prolog decision rules from JSON, YAML, or console input."""
+
+import argparse
+import json
+import os
+import subprocess
+import sys
+import tempfile
+
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.dirname(SCRIPT_DIR)
+RULES_DIR = os.path.join(PROJECT_ROOT, "rules")
+TESTS_DIR = os.path.join(PROJECT_ROOT, "tests")
+
+
+def find_swipl():
+    """Locate the swipl binary."""
+    from shutil import which
+    path = which("swipl")
+    if not path:
+        print("Error: swipl not found. Install SWI-Prolog first.", file=sys.stderr)
+        sys.exit(1)
+    return path
+
+
+def run_swipl(args, cwd=None):
+    """Run swipl with given args, return (stdout, stderr, returncode)."""
+    cmd = [find_swipl()] + args
+    result = subprocess.run(cmd, capture_output=True, text=True, cwd=cwd or RULES_DIR)
+    return result.stdout, result.stderr, result.returncode
+
+
+def parse_input(source):
+    """Parse input from file path or stdin. Returns list of client dicts."""
+    if source == "-" or source is None:
+        raw = sys.stdin.read()
+    else:
+        with open(source) as f:
+            raw = f.read()
+
+    # Try JSON first
+    try:
+        data = json.loads(raw)
+        if isinstance(data, dict):
+            data = [data]
+        return data
+    except json.JSONDecodeError:
+        pass
+
+    # Try YAML
+    try:
+        import yaml
+        data = yaml.safe_load(raw)
+        if isinstance(data, dict):
+            data = [data]
+        if isinstance(data, list):
+            return data
+    except ImportError:
+        pass
+    except Exception:
+        pass
+
+    print("Error: could not parse input as JSON or YAML.", file=sys.stderr)
+    sys.exit(1)
+
+
+def validate_client(client):
+    """Validate that a client dict has all required fields."""
+    required = {"name", "income", "score", "debt"}
+    missing = required - set(client.keys())
+    if missing:
+        print(f"Error: missing fields {missing} in {client}", file=sys.stderr)
+        sys.exit(1)
+
+
+def build_prolog_facts(clients):
+    """Generate Prolog fact lines from client dicts."""
+    lines = []
+    for c in clients:
+        name = str(c["name"]).lower().replace("'", "")
+        lines.append(
+            f"cliente({name}, renda({c['income']}), score({c['score']}), divida({c['debt']}))."
+        )
+    return lines
+
+
+def evaluate(clients, output_format):
+    """Evaluate clients against the rules engine."""
+    for c in clients:
+        validate_client(c)
+
+    facts = build_prolog_facts(clients)
+    names = [str(c["name"]).lower().replace("'", "") for c in clients]
+
+    # Build a temporary clients module with user-supplied facts,
+    # then a loader that overrides the default clients module.
+    tmp_clients = None
+    tmp_loader = None
+    try:
+        tmp_clients = tempfile.NamedTemporaryFile(
+            mode="w", suffix=".pl", dir=RULES_DIR, prefix="user_clients_", delete=False
+        )
+        tmp_clients.write(":- module(clients, [cliente/4]).\n\n")
+        for fact in facts:
+            tmp_clients.write(fact + "\n")
+        tmp_clients.close()
+
+        tmp_loader = tempfile.NamedTemporaryFile(
+            mode="w", suffix=".pl", dir=RULES_DIR, prefix="loader_", delete=False
+        )
+        tmp_loader.write(f":- use_module('{tmp_clients.name}').\n")
+        tmp_loader.write(":- use_module(core).\n")
+        tmp_loader.write(":- use_module(library(http/json)).\n")
+        tmp_loader.close()
+
+        names_list = ",".join(f"'{n}'" for n in names)
+        goal = (
+            f"forall(member(C, [{names_list}]), "
+            f"(aprovar_credito(C, D), "
+            f"json_write_dict(current_output, _{{cliente: C, decisao: D}}), nl)), halt"
+        )
+        stdout, stderr, rc = run_swipl(
+            ["-q", "-s", tmp_loader.name, "-g", goal, "-t", "halt(1)"]
+        )
+    finally:
+        if tmp_clients:
+            os.unlink(tmp_clients.name)
+        if tmp_loader:
+            os.unlink(tmp_loader.name)
+
+    if rc != 0:
+        print(f"Prolog error:\n{stderr}", file=sys.stderr)
+        sys.exit(rc)
+
+    if output_format == "table":
+        print_table(stdout)
+    else:
+        print(stdout, end="")
+
+
+def print_table(json_lines):
+    """Format JSON-per-line output as a table."""
+    rows = []
+    for line in json_lines.strip().split("\n"):
+        if line.strip():
+            rows.append(json.loads(line))
+
+    if not rows:
+        print("No results.")
+        return
+
+    print(f"{'Client':<15} {'Decision':<20}")
+    print("-" * 35)
+    for r in rows:
+        print(f"{r['cliente']:<15} {r['decisao']:<20}")
+
+
+def interactive_mode(output_format):
+    """Prompt user for client data interactively."""
+    clients = []
+    while True:
+        print("\n--- New client ---")
+        try:
+            name = input("Name: ").strip()
+            income = int(input("Income: ").strip())
+            score = int(input("Score: ").strip())
+            debt = int(input("Debt: ").strip())
+        except (EOFError, KeyboardInterrupt):
+            print()
+            break
+
+        clients.append({"name": name, "income": income, "score": score, "debt": debt})
+
+        try:
+            again = input("Add another? (y/n): ").strip().lower()
+        except (EOFError, KeyboardInterrupt):
+            print()
+            break
+        if again != "y":
+            break
+
+    if clients:
+        evaluate(clients, output_format)
+
+
+def run_example(test_name):
+    """Run a test suite or list available tests."""
+    if test_name is None:
+        # List available tests
+        import glob
+        pattern = os.path.join(TESTS_DIR, "*_tests.pl")
+        tests = sorted(glob.glob(pattern))
+        if not tests:
+            print("No tests found in tests/", file=sys.stderr)
+            sys.exit(1)
+        print("Available tests:")
+        for t in tests:
+            name = os.path.basename(t).replace("_tests.pl", "")
+            print(f"  {name}")
+        return
+
+    test_file = os.path.join(TESTS_DIR, f"{test_name}_tests.pl")
+    if not os.path.isfile(test_file):
+        print(f"Error: test file not found: {test_file}", file=sys.stderr)
+        sys.exit(1)
+
+    print(f"Running {test_name} tests...\n")
+    stdout, stderr, rc = run_swipl(
+        ["-q", "-s", test_file, "-g", "run_tests, halt", "-t", "halt(1)"],
+        cwd=PROJECT_ROOT,
+    )
+    print(stdout, end="")
+    if stderr:
+        print(stderr, end="", file=sys.stderr)
+    sys.exit(rc)
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        prog="poemreason",
+        description="Run PoemReason decision rules from JSON, YAML, or console input.",
+    )
+    parser.add_argument(
+        "--input", "-i",
+        metavar="FILE",
+        help="Input file (JSON or YAML). Use '-' for stdin.",
+    )
+    parser.add_argument(
+        "--interactive",
+        action="store_true",
+        help="Enter client data interactively.",
+    )
+    parser.add_argument(
+        "--example",
+        nargs="?",
+        const=None,
+        default=False,
+        metavar="TEST_NAME",
+        help="Run a test suite by name, or list available tests if no name given.",
+    )
+    parser.add_argument(
+        "--format", "-f",
+        choices=["json", "table"],
+        default="json",
+        help="Output format (default: json).",
+    )
+
+    args = parser.parse_args()
+
+    # --example (present but maybe no value) vs not present (False)
+    if args.example is not False:
+        run_example(args.example)
+    elif args.interactive:
+        interactive_mode(args.format)
+    elif args.input:
+        clients = parse_input(args.input)
+        evaluate(clients, args.format)
+    elif not sys.stdin.isatty():
+        clients = parse_input("-")
+        evaluate(clients, args.format)
+    else:
+        parser.print_help()
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()

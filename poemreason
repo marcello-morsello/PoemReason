@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# Wrapper: runs scripts/poemreason with the project venv if available.
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PYTHON="python3"
+if [ -f "$SCRIPT_DIR/.venv/bin/python3" ]; then
+    PYTHON="$SCRIPT_DIR/.venv/bin/python3"
+fi
+exec "$PYTHON" "$SCRIPT_DIR/scripts/poemreason" "$@"
