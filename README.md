@@ -1,6 +1,12 @@
 # PoemReason
 
-A deterministic rules engine powered by [SWI-Prolog](https://www.swi-prolog.org/).
+A poetry validation engine powered by [SWI-Prolog](https://www.swi-prolog.org/).
+Analyzes verse structure, scansion (syllable/mora counting), rhyme schemes,
+and poetic forms — from haiku to sonnets.
+
+Um motor de validação de poesia em [SWI-Prolog](https://www.swi-prolog.org/).
+Analisa estrutura de versos, escansão (contagem silábica/moraica), esquemas
+de rima e formas poéticas — do haiku ao soneto.
 
 ## Prerequisites
 
@@ -11,15 +17,10 @@ A deterministic rules engine powered by [SWI-Prolog](https://www.swi-prolog.org/
 ## Setup
 
 ```bash
-# Clone the repo
 git clone https://github.com/marcello-morsello/PoemReason.git
 cd PoemReason
-
-# Create virtual environment and install dependencies
 python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt
-
-# Verify everything is installed
 ./scripts/check_env.sh
 ```
 
@@ -29,67 +30,83 @@ python3 -m venv .venv
 poemreason              CLI entry point (shell wrapper)
 scripts/
 ├── poemreason          Python CLI (called by wrapper)
+├── poem_to_yaml.py     Poem serializer (YAML + Prolog facts)
 └── check_env.sh        Environment check (git, swipl, gh, python3, venv, pip)
 rules/
-├── clients.pl          Client facts (cliente/4)
-└── core.pl             Decision rules and JSON output
+├── g2p.pl              Grapheme-to-phoneme (Brazilian Portuguese)
+├── phonetic_validator.pl  Scansion engine + rhyme (multilingual: PT syllabic, JP moraic)
+├── structural_validator.pl  Structural form validation (haiku → sestina)
+├── diagnostics.pl      Reporting layer (collects violations by stanza/verse)
+├── html_report.pl      Interactive HTML report generator (links to static/)
+└── pipeline.pl         End-to-end orchestration: text → G2P → validation → HTML
+static/
+├── style.css           Editorial stylesheet (cream paper, sepia ink)
+└── script.js           Web Speech API vocalizer (TTS)
 tests/
-└── credit_tests.pl     plunit tests for credit approval
+├── g2p_tests.pl        G2P unit tests (25 words)
+├── phonetic_tests.pl   Scansion, mora, rhyme, form tests
+├── structural_tests.pl Structural form tests (haiku, trova, villanelle, sestina)
+├── diagnostics_tests.pl  Diagnostic report tests (sonnet, villanelle)
+└── pipeline_tests.pl   End-to-end pipeline tests
 requirements.txt        Python dependencies (pyyaml)
 ```
 
+## Architecture / Arquitetura
+
+The engine is organized in four layers:
+
+O motor é organizado em quatro camadas:
+
+| Layer / Camada | Module / Módulo | Role / Papel |
+|---|---|---|
+| 1 — Phonetics / Fonética | `g2p.pl` | Grapheme-to-phoneme: word → `sil/5` structures + IPA |
+| 2a — Phonetic versification / Versificação fonética | `phonetic_validator.pl` | Scansion (escansão), synaloepha (sinalefa), rhyme extraction |
+| 2b — Structural versification / Versificação estrutural | `structural_validator.pl` | Form catalog, metric/rhyme/constraint validation |
+| 3 — Reporting / Relatório | `diagnostics.pl` + `html_report.pl` | Error collection + interactive HTML output |
+| 4 — Pipeline / Orquestração | `pipeline.pl` | Raw text → full analysis → HTML |
+
+### Supported forms / Formas suportadas
+
+Haiku, tanka, trova, quadra, limerick, cordel (sextilha), décima, soneto italiano,
+soneto inglês, vilanela, sextina, verso branco.
+
+### Multilingual / Multilíngue
+
+The `sil/5` representation supports both syllabic traditions (Portuguese — counts
+syllables, cuts at last stress) and moraic traditions (Japanese — counts moras).
+Each tradition uses exactly the trait the other discards: weight (duration) for
+haiku; accent (stress) for decasyllable.
+
+A representação `sil/5` suporta tanto tradições silábicas (português — conta
+sílabas, corta na última tônica) quanto tradições moraicas (japonês — conta moras).
+
 ## CLI usage
 
-The `poemreason` wrapper at the project root auto-detects the `.venv` and runs the Python CLI.
+The `poemreason` wrapper at the project root auto-detects `.venv` and runs the Python CLI.
 
-### Evaluate clients from JSON
-
-```bash
-# Single client via stdin
-echo '{"name":"ana","income":4000,"score":850,"debt":5000}' | ./poemreason
-
-# Multiple clients from file
-./poemreason --input clients.json
-```
-
-```json
-{"cliente":"ana","decisao":"aprovado"}
-```
-
-### Evaluate clients from YAML
+### Analyze a poem from plain text
 
 ```bash
-cat <<EOF | ./poemreason
-- name: bruno
-  income: 10000
-  score: 650
-  debt: 3500
-- name: clara
-  income: 5000
-  score: 850
-  debt: 9000
+# Stanzas separated by blank lines
+cat <<EOF | ./poemreason -f table
+Eu sinto um grande amor
+que sopra como o vento
+e cura toda a dor
+num passo doce e lento
 EOF
 ```
 
-### Table output
+### Analyze from JSON/YAML
 
 ```bash
-echo '[{"name":"joao","income":5000,"score":720,"debt":800}]' | ./poemreason -f table
+echo '{"title":"Minha Trova","form":"trova","stanzas":[["Eu sinto um grande amor","que sopra como o vento","e cura toda a dor","num passo doce e lento"]]}' | ./poemreason
 ```
 
-```
-Client          Decision
------------------------------------
-joao            aprovado
-```
-
-### Interactive mode
+### Generate HTML report
 
 ```bash
-./poemreason --interactive
+cat poem.txt | ./poemreason --html report.html
 ```
-
-Prompts for name, income, score, and debt for each client.
 
 ### Run tests
 
@@ -98,25 +115,21 @@ Prompts for name, income, score, and debt for each client.
 ./poemreason --example
 
 # Run a specific test suite
-./poemreason --example credit
+./poemreason --example g2p
+./poemreason --example structural
 ```
 
 ### Direct Prolog queries
 
 ```bash
-swipl -q -s rules/core.pl \
-  -g "aprovar_credito(joao, D), format('~w~n', [D]), halt" \
+# G2P for a single word
+swipl -q -s rules/g2p.pl -g "g2p(casa, _, IPA), format('~w~n', [IPA]), halt"
+
+# Validate a structural form
+swipl -q -s rules/structural_validator.pl \
+  -g "exemplo(minha_trova, P), valida(trova, P), writeln(ok), halt" \
   -t "halt(1)"
 ```
-
-## Decision rules
-
-| Condition | Decision |
-|-----------|----------|
-| Score >= 800 | `aprovado` (regardless of debt) |
-| Score >= 700 and debt < 30% of income | `aprovado` |
-| Score >= 600 and debt < 40% of income | `analise_manual` |
-| Otherwise | `negado` |
 
 ## Contributing
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""PoemReason CLI — run Prolog decision rules from JSON, YAML, or console input."""
+"""PoemReason CLI — validate and analyze poems using the Prolog poetry engine."""
 
 import argparse
 import json
@@ -31,20 +31,26 @@ def run_swipl(args, cwd=None):
     return result.stdout, result.stderr, result.returncode
 
 
-def parse_input(source):
-    """Parse input from file path or stdin. Returns list of client dicts."""
+def parse_poem_input(source):
+    """Parse poem input from file or stdin.
+
+    Accepts:
+      - JSON: {"title": "...", "form": "...", "stanzas": [["line", ...], ...]}
+      - YAML: same structure
+      - Plain text: stanzas separated by blank lines
+    Returns a dict with keys: title, form, stanzas.
+    """
     if source == "-" or source is None:
         raw = sys.stdin.read()
     else:
         with open(source) as f:
             raw = f.read()
 
-    # Try JSON first
+    # Try JSON
     try:
         data = json.loads(raw)
-        if isinstance(data, dict):
-            data = [data]
-        return data
+        if isinstance(data, dict) and "stanzas" in data:
+            return data
     except json.JSONDecodeError:
         pass
 
@@ -52,94 +58,91 @@ def parse_input(source):
     try:
         import yaml
         data = yaml.safe_load(raw)
-        if isinstance(data, dict):
-            data = [data]
-        if isinstance(data, list):
+        if isinstance(data, dict) and "stanzas" in data:
             return data
     except ImportError:
         pass
     except Exception:
         pass
 
-    print("Error: could not parse input as JSON or YAML.", file=sys.stderr)
-    sys.exit(1)
+    # Plain text: stanzas separated by blank lines
+    stanzas = []
+    current = []
+    for line in raw.strip().split("\n"):
+        stripped = line.strip()
+        if stripped == "":
+            if current:
+                stanzas.append(current)
+                current = []
+        else:
+            current.append(stripped)
+    if current:
+        stanzas.append(current)
 
-
-def validate_client(client):
-    """Validate that a client dict has all required fields."""
-    required = {"name", "income", "score", "debt"}
-    missing = required - set(client.keys())
-    if missing:
-        print(f"Error: missing fields {missing} in {client}", file=sys.stderr)
+    if not stanzas:
+        print("Error: no poem text found in input.", file=sys.stderr)
         sys.exit(1)
 
-
-def build_prolog_facts(clients):
-    """Generate Prolog fact lines from client dicts."""
-    lines = []
-    for c in clients:
-        name = str(c["name"]).lower().replace("'", "")
-        lines.append(
-            f"cliente({name}, renda({c['income']}), score({c['score']}), divida({c['debt']}))."
-        )
-    return lines
+    return {"title": "Untitled", "form": "cancao", "stanzas": stanzas}
 
 
-def evaluate(clients, output_format):
-    """Evaluate clients against the rules engine."""
-    for c in clients:
-        validate_client(c)
+def analyze_poem(poem_data, output_format, html_output=None):
+    """Analyze a poem using the Prolog pipeline."""
+    title = poem_data.get("title", "Untitled")
+    form = poem_data.get("form", "cancao")
+    stanzas = poem_data["stanzas"]
 
-    facts = build_prolog_facts(clients)
-    names = [str(c["name"]).lower().replace("'", "") for c in clients]
+    # Build Prolog stanza list
+    stanza_terms = []
+    for stanza in stanzas:
+        verses = ", ".join(f'"{v}"' for v in stanza)
+        stanza_terms.append(f"[{verses}]")
+    stanzas_prolog = "[" + ", ".join(stanza_terms) + "]"
 
-    # Build a temporary clients module with user-supplied facts,
-    # then a loader that overrides the default clients module.
-    tmp_clients = None
-    tmp_loader = None
+    tmp = None
     try:
-        tmp_clients = tempfile.NamedTemporaryFile(
-            mode="w", suffix=".pl", dir=RULES_DIR, prefix="user_clients_", delete=False
+        tmp = tempfile.NamedTemporaryFile(
+            mode="w", suffix=".pl", dir=RULES_DIR, prefix="analyze_", delete=False
         )
-        tmp_clients.write(":- module(clients, [cliente/4]).\n\n")
-        for fact in facts:
-            tmp_clients.write(fact + "\n")
-        tmp_clients.close()
+        tmp.write(":- encoding(utf8).\n")
+        tmp.write(":- use_module(pipeline).\n")
+        tmp.write(":- use_module(phonetic_validator, [contagens/3, cauda_consoante/2]).\n")
+        tmp.write(":- use_module(library(http/json)).\n")
+        tmp.close()
 
-        tmp_loader = tempfile.NamedTemporaryFile(
-            mode="w", suffix=".pl", dir=RULES_DIR, prefix="loader_", delete=False
-        )
-        tmp_loader.write(f":- use_module('{tmp_clients.name}').\n")
-        tmp_loader.write(":- use_module(core).\n")
-        tmp_loader.write(":- use_module(library(http/json)).\n")
-        tmp_loader.close()
-
-        names_list = ",".join(f"'{n}'" for n in names)
+        # Build goal: extract features for each verse and output JSON
         goal = (
-            f"forall(member(C, [{names_list}]), "
-            f"(aprovar_credito(C, D), "
-            f"json_write_dict(current_output, _{{cliente: C, decisao: D}}), nl)), halt"
+            f"Estrofes = {stanzas_prolog}, "
+            f"forall(member(Est, Estrofes), "
+            f"  forall(member(Txt, Est), "
+            f"    (verso_ln(Txt, ln(_, IPA, Cont, Classe)), "
+            f"     json_write_dict(current_output, "
+            f"       _{{verso: Txt, ipa: IPA, silabas: Cont, rima: Classe}}), nl))), "
+            f"halt"
         )
+
         stdout, stderr, rc = run_swipl(
-            ["-q", "-s", tmp_loader.name, "-g", goal, "-t", "halt(1)"]
+            ["-q", "-s", tmp.name, "-g", goal, "-t", "halt(1)"]
         )
     finally:
-        if tmp_clients:
-            os.unlink(tmp_clients.name)
-        if tmp_loader:
-            os.unlink(tmp_loader.name)
+        if tmp:
+            os.unlink(tmp.name)
 
     if rc != 0:
         print(f"Prolog error:\n{stderr}", file=sys.stderr)
         sys.exit(rc)
 
     if output_format == "table":
-        print_table(stdout)
+        print_table(stdout, title, form)
     else:
         print(stdout, end="")
 
+    # Generate HTML if requested
+    if html_output:
+        generate_html(poem_data, html_output)
 
-def print_table(json_lines):
+
+def print_table(json_lines, title, form):
     """Format JSON-per-line output as a table."""
     rows = []
     for line in json_lines.strip().split("\n"):
@@ -150,44 +153,61 @@ def print_table(json_lines):
         print("No results.")
         return
 
-    print(f"{'Client':<15} {'Decision':<20}")
-    print("-" * 35)
+    print(f"Poem: {title}  (form: {form})")
+    print(f"{'Verse':<40} {'Syllables':<12} {'Rhyme':<12} {'IPA'}")
+    print("-" * 90)
     for r in rows:
-        print(f"{r['cliente']:<15} {r['decisao']:<20}")
+        verso = r.get("verso", "")[:38]
+        sil = str(r.get("silabas", []))
+        rima = str(r.get("rima", ""))
+        ipa = r.get("ipa", "")
+        print(f"{verso:<40} {sil:<12} {rima:<12} {ipa}")
 
 
-def interactive_mode(output_format):
-    """Prompt user for client data interactively."""
-    clients = []
-    while True:
-        print("\n--- New client ---")
-        try:
-            name = input("Name: ").strip()
-            income = int(input("Income: ").strip())
-            score = int(input("Score: ").strip())
-            debt = int(input("Debt: ").strip())
-        except (EOFError, KeyboardInterrupt):
-            print()
-            break
+def generate_html(poem_data, output_path):
+    """Generate an HTML report via the Prolog pipeline."""
+    title = poem_data.get("title", "Untitled")
+    form = poem_data.get("form", "cancao")
+    stanzas = poem_data["stanzas"]
 
-        clients.append({"name": name, "income": income, "score": score, "debt": debt})
+    stanza_terms = []
+    for stanza in stanzas:
+        verses = ", ".join(f'"{v}"' for v in stanza)
+        stanza_terms.append(f"[{verses}]")
+    stanzas_prolog = "[" + ", ".join(stanza_terms) + "]"
 
-        try:
-            again = input("Add another? (y/n): ").strip().lower()
-        except (EOFError, KeyboardInterrupt):
-            print()
-            break
-        if again != "y":
-            break
+    abs_output = os.path.abspath(output_path)
 
-    if clients:
-        evaluate(clients, output_format)
+    tmp = None
+    try:
+        tmp = tempfile.NamedTemporaryFile(
+            mode="w", suffix=".pl", dir=RULES_DIR, prefix="html_", delete=False
+        )
+        tmp.write(":- encoding(utf8).\n")
+        tmp.write(":- use_module(pipeline).\n")
+        tmp.close()
+
+        goal = (
+            f'gera_de_texto("{abs_output}", "{title}", {form}, {stanzas_prolog}), halt'
+        )
+
+        stdout, stderr, rc = run_swipl(
+            ["-q", "-s", tmp.name, "-g", goal, "-t", "halt(1)"]
+        )
+    finally:
+        if tmp:
+            os.unlink(tmp.name)
+
+    if rc != 0:
+        print(f"HTML generation error:\n{stderr}", file=sys.stderr)
+        sys.exit(rc)
+
+    print(f"HTML report written to: {abs_output}")
 
 
 def run_example(test_name):
     """Run a test suite or list available tests."""
     if test_name is None:
-        # List available tests
         import glob
         pattern = os.path.join(TESTS_DIR, "*_tests.pl")
         tests = sorted(glob.glob(pattern))
@@ -219,17 +239,17 @@ def run_example(test_name):
 def main():
     parser = argparse.ArgumentParser(
         prog="poemreason",
-        description="Run PoemReason decision rules from JSON, YAML, or console input.",
+        description="Analyze and validate poems using the PoemReason poetry engine.",
     )
     parser.add_argument(
         "--input", "-i",
         metavar="FILE",
-        help="Input file (JSON or YAML). Use '-' for stdin.",
+        help="Input file (JSON, YAML, or plain text). Use '-' for stdin.",
     )
     parser.add_argument(
-        "--interactive",
-        action="store_true",
-        help="Enter client data interactively.",
+        "--html",
+        metavar="FILE",
+        help="Generate an HTML report to the specified file.",
     )
     parser.add_argument(
         "--example",
@@ -248,17 +268,14 @@ def main():
 
     args = parser.parse_args()
 
-    # --example (present but maybe no value) vs not present (False)
     if args.example is not False:
         run_example(args.example)
-    elif args.interactive:
-        interactive_mode(args.format)
     elif args.input:
-        clients = parse_input(args.input)
-        evaluate(clients, args.format)
+        poem = parse_poem_input(args.input)
+        analyze_poem(poem, args.format, args.html)
     elif not sys.stdin.isatty():
-        clients = parse_input("-")
-        evaluate(clients, args.format)
+        poem = parse_poem_input("-")
+        analyze_poem(poem, args.format, args.html)
     else:
         parser.print_help()
         sys.exit(1)

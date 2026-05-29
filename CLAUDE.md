@@ -1,8 +1,14 @@
-# PoemReason — Deterministic Rules Engine (SWI-Prolog)
+# PoemReason — Poetry Validation Engine (SWI-Prolog)
 
 ## Overview
-This project uses SWI-Prolog for deterministic decision rules.
-Rule bases live in `rules/*.pl`. Tests live in `tests/*.pl`.
+This project uses SWI-Prolog to validate and analyze poetic forms.
+The engine performs grapheme-to-phoneme conversion, syllable/mora counting
+(escansão), rhyme extraction, and structural form validation.
+Rule modules live in `rules/*.pl`. Tests live in `tests/*.pl`.
+
+Este projeto usa SWI-Prolog para validar e analisar formas poéticas.
+O motor realiza conversão grafema-fonema, contagem silábica/moraica
+(escansão), extração de rima e validação estrutural de formas.
 
 ## Environment
 - **Storage**: Dropbox-synced directory (`~/Dropbox/Projects/PoemReason`), used across multiple machines.
@@ -21,7 +27,7 @@ Rule bases live in `rules/*.pl`. Tests live in `tests/*.pl`.
 Use SWI-Prolog in non-interactive mode:
 
 ```bash
-swipl -q -s rules/core.pl -g "GOAL, halt" -t "halt(1)"
+swipl -q -s rules/pipeline.pl -g "GOAL, halt" -t "halt(1)"
 ```
 
 - `-q`: suppress banner
@@ -29,9 +35,16 @@ swipl -q -s rules/core.pl -g "GOAL, halt" -t "halt(1)"
 - `-g GOAL`: execute goal and exit
 - `-t "halt(1)"`: exit code ≠ 0 on failure
 
-Example:
+Example — G2P for a single word:
 ```bash
-swipl -q -s rules/core.pl -g "aprovar_credito(joao, V), format('~w~n', [V]), halt" -t "halt(1)"
+swipl -q -s rules/g2p.pl -g "g2p(casa, _, IPA), format('~w~n', [IPA]), halt" -t "halt(1)"
+```
+
+Example — validate a poetic form:
+```bash
+swipl -q -s rules/structural_validator.pl \
+  -g "exemplo(minha_trova, P), valida(trova, P), writeln(ok), halt" \
+  -t "halt(1)"
 ```
 
 ## Language Rules
@@ -63,7 +76,7 @@ swipl -q -s rules/core.pl -g "aprovar_credito(joao, V), format('~w~n', [V]), hal
 
 ### JSON output
 - When output will be consumed by code, use `library(http/json)` and `json_write_dict/2` instead of `format/2`.
-- Predicates that write JSON should be named `*_json/N` (e.g., `aprovar_credito_json/1`).
+- Predicates that write JSON should be named `*_json/N`.
 
 ### Testing
 - Use **plunit** (`library(plunit)`) — it ships with SWI-Prolog.
@@ -72,7 +85,11 @@ swipl -q -s rules/core.pl -g "aprovar_credito(joao, V), format('~w~n', [V]), hal
 - Add a determinism test with `forall` + `once/1` for predicates marked `is det`.
 - Always run tests before committing:
   ```bash
-  swipl -q -s tests/credit_tests.pl -g "run_tests, halt" -t "halt(1)"
+  swipl -q -s tests/g2p_tests.pl -g "run_tests, halt" -t "halt(1)"
+  swipl -q -s tests/phonetic_tests.pl -g "run_tests, halt" -t "halt(1)"
+  swipl -q -s tests/structural_tests.pl -g "run_tests, halt" -t "halt(1)"
+  swipl -q -s tests/diagnostics_tests.pl -g "run_tests, halt" -t "halt(1)"
+  swipl -q -s tests/pipeline_tests.pl -g "run_tests, halt" -t "halt(1)"
   ```
 
 ## Environment check
@@ -80,10 +97,14 @@ Run `scripts/check_env.sh` to verify all required tools are installed.
 It detects the OS (macOS/Linux/Windows) and prints install commands for any missing tool.
 
 ## Common tasks
-- **Add a rule**: edit `rules/core.pl`, run the corresponding test.
-- **Debug**: use `trace, GOAL` in an interactive session (`swipl rules/core.pl`).
-- **List predicates**: `swipl -q -s rules/core.pl -g "listing, halt"`.
-- **JSON output for all clients**:
+- **Add a poetic form**: add a `forma/4` clause in `rules/structural_validator.pl`, then a test in `tests/structural_tests.pl`.
+- **Add G2P rules**: edit `rules/g2p.pl`, run `tests/g2p_tests.pl`.
+- **Debug**: use `trace, GOAL` in an interactive session (`swipl rules/pipeline.pl`).
+- **Analyze a poem from text**:
   ```bash
-  swipl -q -s rules/core.pl -g "forall(core:cliente(C,_,_,_), aprovar_credito_json(C)), halt"
+  echo "Velha lagoa quieta" | ./poemreason -f table
+  ```
+- **Generate HTML report**:
+  ```bash
+  cat poem.txt | ./poemreason --html report.html
   ```
