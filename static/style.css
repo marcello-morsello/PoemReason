@@ -1,0 +1,55 @@
+/* PoemReason — editorial poetry report stylesheet */
+/* Estética editorial: papel creme, tinta sépia */
+
+:root{
+  --papel:#f3ece0; --tinta:#2a241e; --suave:#7c7164;
+  --oxido:#9a3b2c; --verde:#5d7152; --linha:#d8cdba;
+}
+*{box-sizing:border-box}
+body{margin:0;background:
+  radial-gradient(circle at 20% 0%, #f8f2e7, var(--papel)) fixed;
+  color:var(--tinta);font-family:"EB Garamond",Georgia,serif;
+  line-height:1.5;padding:48px 16px}
+.folha{max-width:760px;margin:0 auto;background:#fbf6ec;
+  border:1px solid var(--linha);
+  box-shadow:0 1px 0 #fff inset, 0 24px 60px -28px rgba(60,40,20,.45);
+  padding:56px 56px 64px}
+.cabeca{text-align:center;border-bottom:1px solid var(--linha);
+  padding-bottom:28px;margin-bottom:8px}
+.forma{font-variant:small-caps;letter-spacing:.28em;text-transform:lowercase;
+  color:var(--suave);margin:0 0 6px;font-size:.8rem}
+h1{font-weight:500;font-size:2.5rem;margin:.1em 0 .5em;font-style:italic;
+  letter-spacing:.01em}
+.badge{display:inline-block;font-size:.72rem;font-variant:small-caps;
+  letter-spacing:.12em;padding:3px 12px;border-radius:999px;border:1px solid}
+.badge.ok{color:var(--verde);border-color:var(--verde)}
+.badge.bad{color:var(--oxido);border-color:var(--oxido)}
+.dizer-tudo{display:block;margin:18px auto 0;background:none;cursor:pointer;
+  border:1px solid var(--tinta);color:var(--tinta);font-family:inherit;
+  font-size:.85rem;letter-spacing:.08em;padding:7px 18px;border-radius:2px;
+  transition:.2s}
+.dizer-tudo:hover{background:var(--tinta);color:var(--papel)}
+.estrofe{display:grid;grid-template-columns:46px 1fr;gap:8px;
+  margin:34px 0;animation:surge .6s both}
+.estrofe:nth-child(2){animation-delay:.05s}
+.estrofe:nth-child(3){animation-delay:.12s}
+@keyframes surge{from{opacity:0;transform:translateY(8px)}to{opacity:1}}
+.num{font-style:italic;font-size:1.5rem;color:var(--suave);text-align:right;
+  padding-top:2px;user-select:none}
+.linha{display:grid;grid-template-columns:14px 30px 1fr;align-items:start;
+  gap:10px;padding:8px 0;border-bottom:1px dotted transparent}
+.linha:hover{border-bottom-color:var(--linha)}
+.marca{width:8px;height:8px;border-radius:50%;margin-top:12px}
+.linha.ok .marca{background:var(--verde);opacity:.5}
+.linha.bad .marca{background:var(--oxido);box-shadow:0 0 0 3px rgba(154,59,44,.15)}
+.dizer{border:none;background:none;cursor:pointer;font-size:1rem;opacity:.35;
+  transition:.15s;padding:6px 2px}
+.dizer:hover{opacity:1;transform:scale(1.18)}
+.verso{margin:0;font-size:1.35rem}
+.linha.bad .verso{color:var(--oxido)}
+.ipa{margin:2px 0 0;font-family:"Gentium Book Plus",serif;font-style:italic;
+  color:var(--suave);font-size:1rem;letter-spacing:.02em}
+.notas{margin:6px 0 2px;padding-left:1.1em;color:var(--oxido);font-size:.92rem}
+.notas b{font-variant:small-caps;letter-spacing:.06em}
+@media(max-width:560px){.folha{padding:32px 22px}h1{font-size:2rem}
+  .estrofe{grid-template-columns:28px 1fr}}
