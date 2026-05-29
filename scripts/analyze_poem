@@ -1,0 +1,327 @@
+#!/usr/bin/env python3
+"""analyze_poem — Read a poem from a .md file, tokenize it, and submit to the Prolog engine.
+
+Reads a Markdown file containing a poem (one verse per line, stanzas separated
+by blank lines).  Strips punctuation for the G2P layer, preserves the original
+text for display, and validates each stanza against all known structural forms.
+
+Usage:
+    ./scripts/analyze_poem poems/cancao_do_exilio.md
+    ./scripts/analyze_poem poems/cancao_do_exilio.md --html report.html
+"""
+
+import argparse
+import json
+import os
+import re
+import subprocess
+import sys
+import tempfile
+
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.dirname(SCRIPT_DIR)
+RULES_DIR = os.path.join(PROJECT_ROOT, "rules")
+TMP_DIR = os.path.join(PROJECT_ROOT, "tmp")
+
+
+def find_swipl():
+    from shutil import which
+    path = which("swipl")
+    if not path:
+        print("Error: swipl not found.", file=sys.stderr)
+        sys.exit(1)
+    return path
+
+
+def run_swipl(args):
+    cmd = [find_swipl()] + args
+    result = subprocess.run(cmd, capture_output=True, text=True, cwd=TMP_DIR)
+    return result.stdout, result.stderr, result.returncode
+
+
+def parse_poem_md(path):
+    """Parse a .md file into (title, list of stanzas).
+
+    The first line starting with '# ' is treated as the title.
+    Stanzas are separated by blank lines.
+    """
+    with open(path, encoding="utf-8") as f:
+        text = f.read()
+
+    title = None
+    stanzas = []
+    current = []
+    for line in text.strip().split("\n"):
+        stripped = line.strip()
+        if stripped.startswith("# ") and title is None:
+            title = stripped[2:].strip()
+            continue
+        if stripped == "":
+            if current:
+                stanzas.append(current)
+                current = []
+        else:
+            current.append(stripped)
+    if current:
+        stanzas.append(current)
+
+    return title or os.path.splitext(os.path.basename(path))[0], stanzas
+
+
+def clean_for_g2p(verse):
+    """Strip punctuation that the G2P layer can't handle, keeping letters and spaces."""
+    # Remove punctuation but keep accented chars, apostrophes for elision (qu'inda)
+    cleaned = re.sub(r"[,;:.!?\"—–\-\(\)\[\]]", "", verse)
+    # Normalize whitespace
+    cleaned = re.sub(r"\s+", " ", cleaned).strip()
+    return cleaned
+
+
+def escape_prolog_string(s):
+    """Escape a string for use inside Prolog double quotes."""
+    return s.replace("\\", "\\\\").replace('"', '\\"')
+
+
+def analyze_verses(stanzas):
+    """Run G2P + scansion + rhyme on every verse via the pipeline."""
+    # Build Prolog goal: process each verse through verso_ln
+    all_verses = []
+    for stanza in stanzas:
+        for verse in stanza:
+            all_verses.append(clean_for_g2p(verse))
+
+    verse_terms = ", ".join(f'"{escape_prolog_string(v)}"' for v in all_verses)
+
+    tmp = None
+    try:
+        tmp = tempfile.NamedTemporaryFile(
+            mode="w", suffix=".pl", dir=TMP_DIR, prefix="analyze_md_", delete=False
+        )
+        tmp.write(":- encoding(utf8).\n")
+        tmp.write(":- use_module('../rules/pipeline').\n")
+        tmp.write(":- use_module(library(http/json)).\n")
+        tmp.close()
+
+        goal = (
+            f"forall(member(Txt, [{verse_terms}]), "
+            f"  (verso_ln(Txt, ln(_, IPA, Cont, Classe)), "
+            f"   json_write_dict(current_output, "
+            f"     _{{verso: Txt, ipa: IPA, silabas: Cont, rima: Classe}}, "
+            f"     [width(0)]), nl)), halt"
+        )
+
+        stdout, stderr, rc = run_swipl(
+            ["-q", "-s", tmp.name, "-g", goal, "-t", "halt(1)"]
+        )
+    finally:
+        if tmp:
+            os.unlink(tmp.name)
+
+    if rc != 0:
+        print(f"Prolog error:\n{stderr}", file=sys.stderr)
+        sys.exit(rc)
+
+    results = []
+    for line in stdout.strip().split("\n"):
+        if line.strip():
+            results.append(json.loads(line))
+    return results
+
+
+def validate_stanza(stanza_verses, stanza_num):
+    """Try to validate a single stanza against all known structural forms."""
+    cleaned = [clean_for_g2p(v) for v in stanza_verses]
+    verse_terms = ", ".join(f'"{escape_prolog_string(v)}"' for v in cleaned)
+
+    tmp = None
+    try:
+        tmp = tempfile.NamedTemporaryFile(
+            mode="w", suffix=".pl", dir=TMP_DIR, prefix="validate_md_", delete=False
+        )
+        tmp.write(":- encoding(utf8).\n")
+        tmp.write(":- use_module('../rules/pipeline').\n")
+        tmp.write(":- use_module('../rules/phonetic_validator').\n")
+        tmp.write(":- use_module('../rules/structural_validator').\n")
+        tmp.write(":- use_module(library(http/json)).\n")
+        tmp.close()
+
+        # Build verso/3 from text; convert rhyme list to atom for structural matching
+        goal = (
+            f"Txts = [{verse_terms}], "
+            f"maplist([T,verso(T,Cont,ClAtom)]>>("
+            f"  verso_ln(T, ln(_, _, Cont, Cl)), "
+            f"  atomic_list_concat(Cl, ClAtom)), Txts, Vs), "
+            f"findall(F, (structural_validator:forma(F,_,_,_), F \\= verso_branco, once(structural_validator:valida(F, poema(Vs)))), Fs0), "
+            f"sort(Fs0, Fs), "
+            f"json_write_dict(current_output, "
+            f"  _{{estrofe: {stanza_num}, versos: {len(stanza_verses)}, formas: Fs}}, "
+            f"  [width(0)]), nl, halt"
+        )
+
+        stdout, stderr, rc = run_swipl(
+            ["-q", "-s", tmp.name, "-g", goal, "-t", "halt(1)"]
+        )
+    finally:
+        if tmp:
+            os.unlink(tmp.name)
+
+    if rc != 0:
+        # Might fail if no form matches; try simpler approach
+        return {"estrofe": stanza_num, "versos": len(stanza_verses), "formas": [], "erro": stderr.strip()}
+
+    for line in stdout.strip().split("\n"):
+        if line.strip():
+            return json.loads(line)
+    return {"estrofe": stanza_num, "versos": len(stanza_verses), "formas": []}
+
+
+def validate_whole_poem(stanzas):
+    """Try to validate the entire poem as a single unit against all forms."""
+    all_verses = []
+    for stanza in stanzas:
+        for verse in stanza:
+            all_verses.append(clean_for_g2p(verse))
+
+    verse_terms = ", ".join(f'"{escape_prolog_string(v)}"' for v in all_verses)
+
+    tmp = None
+    try:
+        tmp = tempfile.NamedTemporaryFile(
+            mode="w", suffix=".pl", dir=TMP_DIR, prefix="validate_full_", delete=False
+        )
+        tmp.write(":- encoding(utf8).\n")
+        tmp.write(":- use_module('../rules/pipeline').\n")
+        tmp.write(":- use_module('../rules/phonetic_validator').\n")
+        tmp.write(":- use_module('../rules/structural_validator').\n")
+        tmp.write(":- use_module(library(http/json)).\n")
+        tmp.close()
+
+        goal = (
+            f"Txts = [{verse_terms}], "
+            f"maplist([T,verso(T,Cont,ClAtom)]>>("
+            f"  verso_ln(T, ln(_, _, Cont, Cl)), "
+            f"  atomic_list_concat(Cl, ClAtom)), Txts, Vs), "
+            f"findall(F, (structural_validator:forma(F,_,_,_), F \\= verso_branco, once(structural_validator:valida(F, poema(Vs)))), Fs0), "
+            f"sort(Fs0, Fs), "
+            f"json_write_dict(current_output, "
+            f"  _{{poema_completo: true, total_versos: {len(all_verses)}, formas: Fs}}, "
+            f"  [width(0)]), nl, halt"
+        )
+
+        stdout, stderr, rc = run_swipl(
+            ["-q", "-s", tmp.name, "-g", goal, "-t", "halt(1)"]
+        )
+    finally:
+        if tmp:
+            os.unlink(tmp.name)
+
+    if rc != 0:
+        return {"poema_completo": True, "total_versos": len(all_verses), "formas": [], "erro": stderr.strip()}
+
+    for line in stdout.strip().split("\n"):
+        if line.strip():
+            return json.loads(line)
+    return {"poema_completo": True, "total_versos": len(all_verses), "formas": []}
+
+
+def print_analysis(stanzas, original_stanzas, verse_results):
+    """Print the full analysis in a readable format."""
+    idx = 0
+    for snum, stanza in enumerate(original_stanzas, 1):
+        print(f"\n  Estrofe {snum}:")
+        for verse in stanza:
+            if idx < len(verse_results):
+                r = verse_results[idx]
+                sil = r.get("silabas", [])
+                rima = r.get("rima", "?")
+                ipa = r.get("ipa", "")
+                print(f"    {verse}")
+                print(f"      /{ipa}/  sil={sil}  rima={rima}")
+            idx += 1
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        prog="analyze_poem",
+        description="Read a poem from a .md file, tokenize it, and validate against known forms.",
+    )
+    parser.add_argument("file", help="Path to a .md file containing the poem.")
+    parser.add_argument("--html", metavar="FILE", help="Also generate an HTML report.")
+    args = parser.parse_args()
+
+    if not os.path.isfile(args.file):
+        print(f"Error: file not found: {args.file}", file=sys.stderr)
+        sys.exit(1)
+
+    title, stanzas = parse_poem_md(args.file)
+    if not stanzas:
+        print("Error: no stanzas found in file.", file=sys.stderr)
+        sys.exit(1)
+
+    total_verses = sum(len(s) for s in stanzas)
+    print(f"Poem: {title}")
+    print(f"Stanzas: {len(stanzas)}, Verses: {total_verses}")
+
+    # Analyze each verse
+    print("\n--- Verse analysis ---")
+    verse_results = analyze_verses(stanzas)
+    print_analysis(stanzas, stanzas, verse_results)
+
+    # Validate each stanza individually
+    print("\n\n--- Stanza validation ---")
+    for snum, stanza in enumerate(stanzas, 1):
+        result = validate_stanza(stanza, snum)
+        forms = result.get("formas", [])
+        if forms:
+            print(f"  Estrofe {snum} ({len(stanza)} versos): {', '.join(forms)}")
+        else:
+            print(f"  Estrofe {snum} ({len(stanza)} versos): (nenhuma forma conhecida)")
+
+    # Validate the whole poem as one unit
+    print("\n--- Whole poem validation ---")
+    whole = validate_whole_poem(stanzas)
+    forms = whole.get("formas", [])
+    if forms:
+        print(f"  Poema completo ({total_verses} versos): {', '.join(forms)}")
+    else:
+        print(f"  Poema completo ({total_verses} versos): (nenhuma forma catalogada)")
+
+    # HTML report
+    if args.html:
+        cleaned_stanzas = [[clean_for_g2p(v) for v in s] for s in stanzas]
+        stanza_terms = []
+        for stanza in cleaned_stanzas:
+            verses = ", ".join(f'"{escape_prolog_string(v)}"' for v in stanza)
+            stanza_terms.append(f"[{verses}]")
+        stanzas_prolog = "[" + ", ".join(stanza_terms) + "]"
+        abs_output = os.path.abspath(args.html)
+
+        tmp = None
+        try:
+            tmp = tempfile.NamedTemporaryFile(
+                mode="w", suffix=".pl", dir=TMP_DIR, prefix="html_md_", delete=False
+            )
+            tmp.write(":- encoding(utf8).\n")
+            tmp.write(":- use_module('../rules/pipeline').\n")
+            tmp.close()
+
+            html_title = title
+            goal = (
+                f'gera_de_texto("{abs_output}", "{escape_prolog_string(title)}", '
+                f'cancao, {stanzas_prolog}), halt'
+            )
+            stdout, stderr, rc = run_swipl(
+                ["-q", "-s", tmp.name, "-g", goal, "-t", "halt(1)"]
+            )
+        finally:
+            if tmp:
+                os.unlink(tmp.name)
+
+        if rc != 0:
+            print(f"HTML error:\n{stderr}", file=sys.stderr)
+        else:
+            print(f"\nHTML report: {abs_output}")
+
+
+if __name__ == "__main__":
+    main()
