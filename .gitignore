@@ -1,0 +1,24 @@
+# Dropbox sync artifacts
+.dropbox
+.dropbox.attr
+.dropbox.cache
+*.conflicted copy*
+*(conflited copy*
+*(cópia em conflito*
+
+# macOS
+.DS_Store
+._*
+
+# SWI-Prolog
+*.qlf
+
+# Editor / IDE
+*.swp
+*.swo
+*~
+.idea/
+.vscode/
+
+# Claude Code
+.claude/

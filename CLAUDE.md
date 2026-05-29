@@ -4,6 +4,12 @@
 This project uses SWI-Prolog for deterministic decision rules.
 Rule bases live in `rules/*.pl`. Tests live in `tests/*.pl`.
 
+## Environment
+- **Storage**: Dropbox-synced directory (`~/Dropbox/Projects/PoemReason`), used across multiple machines.
+  - Never commit Dropbox artifacts (`.dropbox`, `*.conflicted copy*`, etc.) — see `.gitignore`.
+  - Be aware of potential sync conflicts when working on multiple machines simultaneously.
+- **Git identity**: `marcello@morsello.net` (personal project, private GitHub repo).
+
 ## Running a query
 Use SWI-Prolog in non-interactive mode:
 
