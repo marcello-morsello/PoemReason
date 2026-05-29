@@ -8,7 +8,14 @@ Rule bases live in `rules/*.pl`. Tests live in `tests/*.pl`.
 - **Storage**: Dropbox-synced directory (`~/Dropbox/Projects/PoemReason`), used across multiple machines.
   - Never commit Dropbox artifacts (`.dropbox`, `*.conflicted copy*`, etc.) — see `.gitignore`.
   - Be aware of potential sync conflicts when working on multiple machines simultaneously.
-- **Git identity**: `marcello@morsello.net` (personal project, private GitHub repo).
+- **Git identity**: `marcello@morsello.net` (personal project, public GitHub repo).
+- **GitHub repo**: `marcello-morsello/PoemReason`
+
+### Branch protection (`main`)
+- Direct pushes to `main` are **blocked** — all changes must go through a Pull Request.
+- Force pushes and branch deletion are **disabled**.
+- Enforce admins is **on** (rules apply to repo owner too).
+- Always create a feature branch, open a PR, and merge via GitHub.
 
 ## Running a query
 Use SWI-Prolog in non-interactive mode:
