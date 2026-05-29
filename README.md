@@ -5,6 +5,7 @@ A deterministic rules engine powered by [SWI-Prolog](https://www.swi-prolog.org/
 ## Prerequisites
 
 - [SWI-Prolog](https://www.swi-prolog.org/Download.html) 8.x or later
+- [Python](https://www.python.org/downloads/) 3.x
 
 ## Project structure
 
