@@ -66,10 +66,24 @@ def parse_poem_input(source):
     except Exception:
         pass
 
-    # Plain text: stanzas separated by blank lines
+    # Plain text: stanzas separated by blank lines.
+    # If the first non-empty line is a Markdown H1 ("# Title — Author (Year)"),
+    # treat it as the title and exclude it from the verses.
+    lines = raw.strip().split("\n")
+    title = "Untitled"
+    start = 0
+    for i, line in enumerate(lines):
+        if line.strip() == "":
+            continue
+        if line.lstrip().startswith("# "):
+            header = line.lstrip()[2:].strip()
+            title = header.split(" — ")[0].strip() or "Untitled"
+            start = i + 1
+        break
+
     stanzas = []
     current = []
-    for line in raw.strip().split("\n"):
+    for line in lines[start:]:
         stripped = line.strip()
         if stripped == "":
             if current:
@@ -84,7 +98,7 @@ def parse_poem_input(source):
         print("Error: no poem text found in input.", file=sys.stderr)
         sys.exit(1)
 
-    return {"title": "Untitled", "form": "cancao", "stanzas": stanzas}
+    return {"title": title, "form": "cancao", "stanzas": stanzas}
 
 
 def build_stanzas_prolog(stanzas):
