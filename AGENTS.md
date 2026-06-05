@@ -110,3 +110,50 @@ It detects the OS (macOS/Linux/Windows) and prints install commands for any miss
   ```bash
   cat poem.txt | ./poemreason --html report.html
   ```
+
+## Where to run git/gh (sandbox vs. native)
+
+**Git and `gh` are not reliable from the Cowork sandbox.** The repo lives
+under a Dropbox mount (`~/Library/CloudStorage`); the sandboxed bash cannot
+remove git locks (`.git/*.lock → Operation not permitted`), which leaves
+commits half-done and wedges the branch.
+
+Division of labor:
+
+- **Cowork**: creates/edits files and runs verification (the test suites
+  listed under **Testing** above) — anything that is **not** git. Does
+  not execute `git commit` / `git push` / `gh` on this mount; instead,
+  leaves changes ready and describes the suggested commit/PR.
+- **Commit + PR**: done from a native user terminal or by Claude Code
+  running locally, following the branch protection rules already
+  documented under **Environment > Branch protection (`main`)**.
+
+If a commit wedges with a stuck `.git/*.lock`, clean it from a native
+terminal: `rm -f .git/*.lock`.
+
+Confirm `gh auth status` before opening/merging a PR. If `gh` is not
+available, open the PR via the URL printed by `git push`
+(`https://github.com/.../pull/new/<branch>`).
+
+## Verification before a PR
+
+Before opening a PR, run the full test suite listed under
+**Conventions > Testing** above (`run_tests, halt` across `g2p_tests.pl`,
+`phonetic_tests.pl`, `structural_tests.pl`, `diagnostics_tests.pl`,
+`pipeline_tests.pl`). All must report `passed`.
+
+When the change touches the CLI or the pipeline, also run a sanity
+analysis end-to-end:
+
+```bash
+echo "Velha lagoa quieta" | ./poemreason -f table
+```
+
+and confirm the output is well-formed.
+
+## Multi-agent coexistence
+
+This project is worked on by **Cowork**, **Claude Code** and possibly
+**Codex**. `AGENTS.md` (this file) is the canonical, agent-agnostic spec.
+`CLAUDE.md` is a one-line `@AGENTS.md` stub. Do not duplicate project
+facts between the two — any new project fact goes here.
