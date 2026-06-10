@@ -58,7 +58,10 @@ conta_ate_tonica(portugues_silabico).
 escande(Trad, Verso, N) :-
     unidade(Trad, silaba), !,
     ( conta_ate_tonica(Trad) -> prefixo_tonica(Verso, Alvo) ; Alvo = Verso ),
-    silabas_com_sinalefa(Trad, Alvo, N).
+    length(Alvo, Len),
+    ( Len > 20
+      -> N = Len  % Shield: bypass synaloepha search for extremely long/prose lines
+      ;  silabas_com_sinalefa(Trad, Alvo, N) ).
 escande(Trad, Verso, N) :-
     unidade(Trad, mora), !,
     soma_moras(Verso, N).

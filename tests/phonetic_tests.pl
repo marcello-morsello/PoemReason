@@ -29,6 +29,14 @@ test(scansion_p3) :-
     exemplo_pt(p3, P3),
     contagens(portugues_silabico, P3, [10]).
 
+% Long line shield test (25 syllables): should bypass synaloepha and return [25] instantly.
+% Final syllable is tonic so prefixo_tonica/2 succeeds and the full 25-syllable prefix
+% reaches the Len > 20 shield in escande/3.
+test(scansion_long_line_shield) :-
+    findall(sil([k],[a],[],1,atona), between(1, 24, _), Atonas),
+    append(Atonas, [sil([k],[a],[],1,tonica)], LongVerse),
+    contagens(portugues_silabico, LongVerse, [25]).
+
 % --- MORA vs SYLLABLE / MORA vs SÍLABA -----------------------
 
 test(haiku_mora_line1) :-
