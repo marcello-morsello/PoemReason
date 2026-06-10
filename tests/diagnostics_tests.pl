@@ -36,6 +36,31 @@ test(sonnet_rhyme_error_v4) :-
     diagnostica(soneto_italiano, P, Probs),
     member(prob(_, 4, rima, _), Probs).
 
+% Short-circuit: a sonnet with the wrong verse count must return ONLY the
+% structural error, even when individual verses also carry metric/rhyme
+% defects that would otherwise be flagged.
+%
+% Curto-circuito: um soneto com numero de versos errado deve devolver
+% APENAS o erro estrutural, mesmo que versos individuais tenham defeitos
+% de metrica/rima que seriam apontados normalmente.
+test(sonnet_short_circuit_on_wrong_verse_count) :-
+    % 13 verses instead of 14; v3 has wrong metric ([7]); v2 has off-group rhyme.
+    BrokenSonnet = poema([
+        verso("v1",  [10], a),
+        verso("v2",  [10], zz),   % rhyme outlier (would trip rima check)
+        verso("v3",  [7],  a),    % wrong metric (would trip metrica check)
+        verso("v4",  [10], a),
+        verso("v5",  [10], a),  verso("v6",  [10], b),
+        verso("v7",  [10], b),  verso("v8",  [10], a),
+        verso("v9",  [10], c),  verso("v10", [10], d),
+        verso("v11", [10], c),  verso("v12", [10], d),
+        verso("v13", [10], c)
+    ]),
+    diagnostica(soneto_italiano, BrokenSonnet, Probs),
+    Probs = [prob(0, 0, estrutura, _)],
+    \+ member(prob(_, _, metrica, _), Probs),
+    \+ member(prob(_, _, rima, _), Probs).
+
 % Villanelle with broken refrain: should detect refrain problem
 test(vilanela_refrain_problem) :-
     diagnostics:exemplo_diag(vilanela_quebrada, P),
