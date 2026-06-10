@@ -109,6 +109,20 @@ else
 fi
 
 echo "---"
+
+# ---- git hooks: agent commit attribution -------------------------
+# Point git at scripts/git_hooks/ so the commit-msg hook stamps each
+# commit with Agent: + Co-Authored-By: trailers automatically.
+HOOKS_PATH="scripts/git_hooks"
+CURRENT_HOOKS_PATH="$(git -C "$PROJECT_ROOT" config --get core.hooksPath 2>/dev/null || true)"
+if [ "$CURRENT_HOOKS_PATH" = "$HOOKS_PATH" ]; then
+    echo "OK  git hooks  (core.hooksPath -> $HOOKS_PATH)"
+else
+    git -C "$PROJECT_ROOT" config core.hooksPath "$HOOKS_PATH"
+    echo "OK  git hooks  (set core.hooksPath -> $HOOKS_PATH)"
+fi
+
+echo "---"
 if [ "$missing" -gt 0 ]; then
     echo "$missing item(s) missing. Install them and re-run this script."
     exit 1

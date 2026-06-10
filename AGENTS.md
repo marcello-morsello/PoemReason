@@ -23,6 +23,116 @@ O motor realiza conversão grafema-fonema, contagem silábica/moraica
 - Enforce admins is **on** (rules apply to repo owner too).
 - Always create a feature branch, open a PR, and merge via GitHub.
 
+## Commit attribution / Atribuição de commits
+
+**Project rule**: every commit credits every contributor. The git
+`Author` field credits the human at the keyboard; AI tools that
+helped (Claude Code, Antigravity, Codex, etc.) are credited as
+`Co-Authored-By` using the project's branded email pattern.
+
+**Regra do projeto**: todo commit credita todos os contribuidores. O
+campo `Author` do git credita o humano no teclado; ferramentas de IA
+que ajudaram (Claude Code, Antigravity, Codex, etc.) são creditadas
+como `Co-Authored-By` no padrão de email da marca do projeto.
+
+### Brand convention / Convenção de marca
+
+These projects use the brand **"Morsello & AI Sons"**.  AI co-authors
+use emails under the project's domain in the form:
+
+```
+<tool>.ai@morsello.net
+```
+
+Currently registered:
+
+| Tool / Ferramenta | `Agent:` trailer | `Co-Authored-By:` |
+|---|---|---|
+| Claude Code (Anthropic) | `Agent: claude` | `Claude Code <claude.ai@morsello.net>` |
+| Antigravity (Google)    | `Agent: antigravity` | `Antigravity <antigravity.ai@morsello.net>` |
+| Codex (OpenAI)          | `Agent: codex` | `Codex <codex.ai@morsello.net>` |
+
+### Per-human forks / Fork por humano
+
+Each human contributor **must work from their own personal fork** of
+this repository.  The `Author` field on every commit then carries the
+contributor's own git identity (linked to their GitHub account),
+which makes attribution unambiguous.  PRs flow from the personal fork
+back to `marcello-morsello/PoemReason`.
+
+Cada humano que contribui **deve trabalhar a partir do seu próprio
+fork** deste repositório.  Assim o `Author` de cada commit carrega a
+identidade git do humano (vinculada à sua conta GitHub), e a
+atribuição fica inequívoca.  PRs sobem do fork pessoal para o
+`marcello-morsello/PoemReason`.
+
+### Automatic stamping / Carimbo automático
+
+A `commit-msg` hook at `scripts/git_hooks/commit-msg` detects the AI
+tool driving the current commit and injects two trailers:
+
+```
+Agent: <name>
+Co-Authored-By: <Display> <name.ai@morsello.net>
+```
+
+Detection is by environment variable:
+
+- Claude Code → `$CLAUDECODE` or `$CLAUDE_CODE_ENTRYPOINT`
+- Antigravity → `$TERM_PROGRAM=antigravity-ide` or any `$ANTIGRAVITY_*`
+- Codex CLI → `$CODEX_HOME` or any `$CODEX_*`
+- Manual override: `AGENT_ID=<name> git commit ...`
+
+The hook is **idempotent** (re-running doesn't duplicate trailers)
+and only activates when a tool is detected — solo human commits in a
+plain terminal pass through unchanged.
+
+### Setup / Setup
+
+`scripts/check_env.sh` is idempotent and sets
+`git config core.hooksPath scripts/git_hooks` on every run.  Run it
+once after every fresh clone:
+
+```bash
+./scripts/check_env.sh
+```
+
+### Multi-agent commits / Commits multi-agente
+
+When a commit includes work from an agent that ran in a previous
+session (not the one committing now), the committing party adds the
+extra trailer manually:
+
+```bash
+git commit -m "..." --trailer "Co-Authored-By: Antigravity <antigravity.ai@morsello.net>"
+```
+
+Same rule for human pair-programming: a second human collaborator
+adds themselves as `Co-Authored-By` with their personal email.
+
+PR reviewers should reject PRs that omit known contributors —
+attribution is project policy, not etiquette.
+
+Quando um commit incluir trabalho de um agente que rodou em outra
+sessão (não a do commit atual), quem comita adiciona o trailer extra
+manualmente.  A mesma regra vale para programação em par humana:
+o segundo colaborador se adiciona como `Co-Authored-By`.  Revisores
+de PR devem rejeitar PRs que omitam contribuidores conhecidos —
+atribuição é política do projeto, não etiqueta.
+
+### Searching / Buscas
+
+```bash
+# Tudo que o Claude tocou:
+git log --grep "Agent: claude"
+
+# Tudo que envolveu qualquer agente de IA:
+git log --grep "\.ai@morsello.net"
+
+# Tabela de responsáveis por commit:
+git log --format='%h | %an | %(trailers:key=Agent,valueonly,separator=%x2C )'
+```
+
 ## Running a query
 Use SWI-Prolog in non-interactive mode:
 
