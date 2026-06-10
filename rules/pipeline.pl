@@ -20,7 +20,7 @@
 % ============================================================
 
 :- use_module(g2p, [g2p/3]).
-:- use_module(phonetic_validator, [contagens/3, cauda_consoante/2]).
+:- use_module(phonetic_validator, [contagens/3, cauda_consoante/2, cauda_toante/2]).
 :- use_module(html_report, [gera_html/5]).
 
 %! linha_sils(+Text, -Syllables, -IPA) is det.
@@ -36,12 +36,19 @@ linha_sils(Texto, Sils, IPA) :-
 palavra_sils(Str, Sils, IPA) :- atom_string(A, Str), g2p(A, Sils, IPA).
 
 %! verso_ln(+Text, -LnRecord) is det.
-%  Converts verse text into ln(Text, IPA, Counts, RhymeClass).
-%  Converte texto de verso em ln(Texto, IPA, Contagens, ClasseDeRima).
-verso_ln(Texto, ln(Texto, IPA, Cont, Classe)) :-
+%  Converts verse text into ln(Text, IPA, Counts, rima(ConsTail, AssoTail)).
+%  The fourth slot carries BOTH the consonant tail (vowels+consonants
+%  from the last stress) and the assonant tail (vowels only), so that
+%  downstream rhyme checks can pick the one matching the form's mode.
+%
+%  Converte texto em ln(Texto, IPA, Contagens, rima(CaudaConsoante, CaudaToante)).
+%  O quarto slot leva AS DUAS caudas — consoante e toante — para que
+%  as checagens de rima a jusante escolham conforme o modo da forma.
+verso_ln(Texto, ln(Texto, IPA, Cont, rima(Cons, Toa))) :-
     linha_sils(Texto, Sils, IPA),
     contagens(portugues_silabico, Sils, Cont),
-    ( cauda_consoante(Sils, Classe) -> true ; Classe = '?' ).
+    ( cauda_consoante(Sils, Cons) -> true ; Cons = '?' ),
+    ( cauda_toante(Sils, Toa)     -> true ; Toa  = '?' ).
 
 %! gera_de_texto(+File, +Title, +Form, +StanzasText) is det.
 %  End-to-end: list of stanzas of text strings -> HTML file.

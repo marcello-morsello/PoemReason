@@ -67,6 +67,30 @@ test(vilanela_refrain_problem) :-
     diagnostica(vilanela, P, Probs),
     member(prob(_, _, refrao, _), Probs).
 
+% A toante (assonant) form accepts verses whose consonant tails
+% differ as long as the vowels align with the pattern.
+%
+% Forma toante aceita versos com caudas consoantes diferentes desde
+% que as vogais sigam o padrão.
+test(cordel_toante_ok) :-
+    diagnostics:exemplo_diag(cordel_toante_ok, P),
+    diagnostica(cordel_sextilha, P, Probs),
+    Probs == [].
+
+% Cordel sextilha breaks at v4 (vowel 'u' instead of 'a'); the
+% majority of letter 'b' is at v2 and v6 (both 'a'), so v4 is the
+% unambiguous outlier.
+%
+% No cordel sextilha, v4 quebra com vogal 'u' em vez de 'a'; a
+% maioria da letra 'b' (em v2 e v6) está em 'a', então v4 é o
+% outlier sem ambiguidade.
+test(cordel_toante_outlier_v4) :-
+    diagnostics:exemplo_diag(cordel_toante_outlier_v4, P),
+    diagnostica(cordel_sextilha, P, Probs),
+    member(prob(_, 4, rima, _), Probs),
+    \+ member(prob(_, 2, rima, _), Probs),
+    \+ member(prob(_, 6, rima, _), Probs).
+
 % estrofe_de locates correctly
 test(stanza_location) :-
     estrofe_de([4,4,3,3], 5, 2, _).

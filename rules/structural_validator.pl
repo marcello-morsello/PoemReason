@@ -23,19 +23,29 @@
 
 % ---- Poem representation / Representação de um poema ---------
 %   poema(ListOfVerses)
-%   verso(Text, PossibleSyllables, RhymeClass)
+%   verso(Text, PossibleSyllables, rima(ConsonantTail, AssonantTail))
+%     Both tails are produced by pipeline:verso_ln/2 so the rhyme
+%     check can pick the one matching the form's mode.
+%     As duas caudas vêm anotadas para a checa_rima/2 escolher a que
+%     corresponde ao modo da forma (consoante ou toante).
 
 % ============================================================
 %  FORM CATALOG / CATÁLOGO DE FORMAS
 %  forma(Name, NumVerses, Metrics, RhymeScheme)
+%    RhymeScheme : livre | branco | [a,b,...]      (consoante por padrão)
+%                | toante([a,b,...])               (rima toante / assonant)
 % ============================================================
 
 forma(haiku,           3,  [5,7,5],            livre).
 forma(tanka,           5,  [5,7,5,7,7],        livre).
 forma(trova,           4,  [7,7,7,7],          [a,b,a,b]).
-forma(quadra,          4,  [7,7,7,7],          [a,b,c,b]).
+% Quadra and cordel sextilha follow the popular Lusophone tradition,
+% which tolerates assonant rhyme (matching only the vowels of the tail).
+% Quadra e cordel sextilha seguem a tradição popular lusófona, que
+% tolera rima toante (só as vogais da cauda).
+forma(quadra,          4,  [7,7,7,7],          toante([a,b,c,b])).
 forma(limerick,        5,  livre,              [a,a,b,b,a]).
-forma(cordel_sextilha, 6,  [7,7,7,7,7,7],      [a,b,c,b,d,b]).
+forma(cordel_sextilha, 6,  [7,7,7,7,7,7],      toante([a,b,c,b,d,b])).
 forma(decima,          10, M,                  [a,b,b,a,a,c,c,d,d,c]) :- repete(7,10,M).
 forma(soneto_italiano, 14, M, [a,b,b,a, a,b,b,a, c,d,c, d,c,d])       :- repete(10,14,M).
 forma(soneto_ingles,   14, M, [a,b,a,b, c,d,c,d, e,f,e,f, g,g])       :- repete(10,14,M).
@@ -71,16 +81,36 @@ checa_metrica([S|Ss], [verso(_, Sil, _)|Vs]) :-
 checa_metrica([], []).
 
 % ---- rhyme / rima ---------------------------------------------
+%  Each verse carries rima(ConsonantTail, AssonantTail) in its third
+%  slot.  The rhyme scheme decides which slot is used:
+%    livre        — no comparison
+%    branco       — all consonant tails must be distinct
+%    toante(L)    — assonant comparison against pattern L
+%    [a,b,...]    — consonant comparison against the pattern
+%
+%  Cada verso traz rima(CaudaConsoante, CaudaToante) no terceiro slot.
+%  O esquema da forma escolhe qual cauda é comparada.
 checa_rima(livre, _).
 checa_rima(branco, Versos) :-
-    sons(Versos, Sons),
+    sons_cons(Versos, Sons),
     todos_distintos(Sons).
+checa_rima(toante(Modelo), Versos) :- !,
+    is_list(Modelo),
+    sons_toante(Versos, Sons),
+    mesma_particao(Modelo, Sons).
 checa_rima(Modelo, Versos) :-
     is_list(Modelo),
-    sons(Versos, Sons),
+    sons_cons(Versos, Sons),
     mesma_particao(Modelo, Sons).
 
-sons(Versos, Sons) :- findall(R, member(verso(_,_,R), Versos), Sons).
+sons_cons(Versos, Sons)   :- findall(C, member(verso(_,_,rima(C,_)), Versos), Sons).
+sons_toante(Versos, Sons) :- findall(A, member(verso(_,_,rima(_,A)), Versos), Sons).
+
+% Legacy accessor used by checa_sextina/1 for the end-word permutation
+% check — it treats the consonant tail as the verse's "end word".
+% Acessor usado por checa_sextina/1 para extrair a "palavra-fim" de
+% cada verso (a cauda consoante).
+sons(Versos, Sons) :- sons_cons(Versos, Sons).
 
 mesma_particao(Modelo, Sons) :-
     length(Modelo, N), length(Sons, N),
@@ -158,35 +188,68 @@ diagnostico(Nome, poema(V)) :-
 %  EXAMPLES / EXEMPLOS
 % ============================================================
 
+% Fixture convention: every verse uses rima(ConsAtom, AssoAtom).
+% For consoante-mode forms (most), the same stub goes in both slots.
+% For toante-mode forms, the AssoAtom drives matching; the ConsAtom
+% can deliberately differ between verses to prove the toante check
+% ignored it.
+%
+% Convenção: cada verso usa rima(AtomCons, AtomToa).  Em formas
+% consoantes, os dois slots recebem o mesmo stub.  Em formas toantes,
+% o segundo slot é o que importa para o casamento.
+
 % Haiku (rima livre -> classes irrelevantes, átomos distintos)
 exemplo(meu_haiku, poema([
-    verso("Velha lagoa quieta",   [5], s1),
-    verso("o sapo salta para a agua", [7], s2),
-    verso("o som da agua ao redor", [5], s3)
+    verso("Velha lagoa quieta",       [5], rima(s1, s1)),
+    verso("o sapo salta para a agua", [7], rima(s2, s2)),
+    verso("o som da agua ao redor",   [5], rima(s3, s3))
 ])).
 
 % Trova ABAB
 exemplo(minha_trova, poema([
-    verso("Eu sinto um grande amor", [7], or),
-    verso("que sopra como o vento",  [7], ento),
-    verso("e cura toda a dor",       [7], or),
-    verso("num passo doce e lento",  [7], ento)
+    verso("Eu sinto um grande amor", [7], rima(or, or)),
+    verso("que sopra como o vento",  [7], rima(ento, ento)),
+    verso("e cura toda a dor",       [7], rima(or, or)),
+    verso("num passo doce e lento",  [7], rima(ento, ento))
 ])).
 
 % Trova com erro de rima (v4 não rima com v2)
 exemplo(trova_errada, poema([
-    verso("Eu sinto um grande amor", [7], or),
-    verso("que sopra como o vento",  [7], ento),
-    verso("e cura toda a dor",       [7], or),
-    verso("num passo bem feliz",     [7], iz)
+    verso("Eu sinto um grande amor", [7], rima(or, or)),
+    verso("que sopra como o vento",  [7], rima(ento, ento)),
+    verso("e cura toda a dor",       [7], rima(or, or)),
+    verso("num passo bem feliz",     [7], rima(iz, iz))
+])).
+
+% Quadra toante: vowel tails align with [a,b,c,b] but consonant tails
+% deliberately disagree at v2 vs v4 (mato/lago) so the toante mode is
+% the only one that lets this poem validate.
+%
+% Quadra toante: as caudas vogais seguem [a,b,c,b]; as consoantes
+% divergem em v2/v4 propositalmente, para provar que só o modo toante
+% aceita este poema.
+exemplo(minha_quadra_toante, poema([
+    verso("vejo o seu olhar",        [7], rima(ar,   a)),
+    verso("entrando pelo mato",      [7], rima(ato,  ao)),
+    verso("eu sigo lá no muro",      [7], rima(uro,  u)),
+    verso("perdido pelo lago",       [7], rima(ago,  ao))
+])).
+
+% Same body, but v4 swaps vowels to break the assonant pattern.
+% Mesmo corpo, mas v4 troca as vogais e quebra o padrão toante.
+exemplo(quadra_toante_quebrada, poema([
+    verso("vejo o seu olhar",        [7], rima(ar,   a)),
+    verso("entrando pelo mato",      [7], rima(ato,  ao)),
+    verso("eu sigo lá no muro",      [7], rima(uro,  u)),
+    verso("perdido pelo fim",        [7], rima(im,   i))
 ])).
 
 % --- VILLANELLE / VILANELA ------------------------------------
 exemplo(minha_vilanela, poema(V)) :-
-    A1 = verso("Nao entres docil nessa noite calma", [10], sa),
-    A2 = verso("Esbraveja ao morrer da clara luz",   [10], sa),
-    M  = verso("(verso do meio, rima b)",            [10], sb),
-    A  = verso("(verso de rima a)",                  [10], sa),
+    A1 = verso("Nao entres docil nessa noite calma", [10], rima(sa, sa)),
+    A2 = verso("Esbraveja ao morrer da clara luz",   [10], rima(sa, sa)),
+    M  = verso("(verso do meio, rima b)",            [10], rima(sb, sb)),
+    A  = verso("(verso de rima a)",                  [10], rima(sa, sa)),
     V  = [A1, M, A2,
           A,  M, A1,
           A,  M, A2,
@@ -198,7 +261,7 @@ exemplo(minha_vilanela, poema(V)) :-
 exemplo(vilanela_quebrada, poema(V)) :-
     exemplo(minha_vilanela, poema(Vok)),
     append(Inicio, [_Ultimo], Vok),
-    append(Inicio, [verso("verso intruso", [10], sa)], V).
+    append(Inicio, [verso("verso intruso", [10], rima(sa, sa))], V).
 
 % --- SESTINA / SEXTINA ----------------------------------------
 exemplo(minha_sextina, poema(V)) :-
@@ -211,7 +274,7 @@ exemplo(minha_sextina, poema(V)) :-
     Envoi = [tempo, luz, mar],
     append(Estrofes, Corpo),
     append(Corpo, Envoi, Palavras),
-    findall(verso("(verso da sextina)", [10], W), member(W, Palavras), V).
+    findall(verso("(verso da sextina)", [10], rima(W, W)), member(W, Palavras), V).
 
 % Sestina with two swapped words in stanza 2
 exemplo(sextina_quebrada, poema(V)) :-

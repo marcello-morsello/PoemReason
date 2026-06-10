@@ -22,12 +22,19 @@
 
 % ---- catalog with stanza structure / catálogo COM estrofes ---
 % forma_estr(Name, StanzaSizes, Metrics, Rhyme)
+%   Rhyme : livre | [a,b,...] (consoante) | toante([a,b,...])
 forma_estr(soneto_italiano, [4,4,3,3], todos(10),
            [a,b,b,a, a,b,b,a, c,d,c, d,c,d]).
 forma_estr(vilanela, [3,3,3,3,3,4], livre,
            [a,b,a, a,b,a, a,b,a, a,b,a, a,b,a, a,b,a,a]).
 forma_estr(trova_dupla, [4,4], todos(7),
            [a,b,a,b, c,d,c,d]).
+% Cordel sextilha: assonant rhyme; letter b appears at positions 2,4,6
+% so the outlier detection has an unambiguous majority of 2 to 1.
+% Cordel sextilha: rima toante; letra 'b' aparece nas posições 2,4,6
+% — maioria de 2 vs 1 dá outlier sem ambiguidade.
+forma_estr(cordel_sextilha, [6], todos(7),
+           toante([a,b,c,b,d,b])).
 forma_estr(cancao, [4,4], livre,
            [a,b,a,b, c,d,c,d]).
 
@@ -74,21 +81,41 @@ expande_metrica(todos(N), Versos, L) :- !, length(Versos, K), length(L, K), mapl
 expande_metrica(L, _, L).
 
 % ---- rhyme: by group, pointing the outlier -------------------
+%  Each verse arrives annotated with rima(ConsTail, AssoTail).
+%  The rhyme scheme decides which slot is read:
+%    livre        — no comparison
+%    toante(L)    — assonant tail (AssoTail)
+%    [a,b,...]    — consonant tail (ConsTail)
+%
+%  Cada verso já chega com rima(CaudaCons, CaudaToa).  O esquema
+%  diz qual slot é lido.
 checa_rima(livre, _, _, []) :- !.
+checa_rima(toante(Modelo), Versos, Estrofes, Probs) :- !,
+    is_list(Modelo),
+    checa_rima_modo(toante, Modelo, Versos, Estrofes, Probs).
 checa_rima(Modelo, Versos, Estrofes, Probs) :-
     is_list(Modelo),
+    checa_rima_modo(consoante, Modelo, Versos, Estrofes, Probs).
+
+checa_rima_modo(Modo, Modelo, Versos, Estrofes, Probs) :-
     setof(Letra, esta_no_modelo(Letra, Modelo), Letras),
-    foldl(checa_grupo_rima(Modelo, Versos, Estrofes), Letras, [], Probs).
+    foldl(checa_grupo_rima(Modo, Modelo, Versos, Estrofes), Letras, [], Probs).
 
 esta_no_modelo(L, Modelo) :- member(L, Modelo).
 
-checa_grupo_rima(Modelo, Versos, Estrofes, Letra, Acc0, Acc) :-
+cauda_de(consoante, rima(C, _), C).
+cauda_de(toante,    rima(_, A), A).
+
+checa_grupo_rima(Modo, Modelo, Versos, Estrofes, Letra, Acc0, Acc) :-
     findall(G, (nth1(G, Modelo, L), L == Letra), Pos),
-    findall(C, (member(G, Pos), nth1(G, Versos, verso(_,_,C))), Classes),
+    findall(C, ( member(G, Pos), nth1(G, Versos, verso(_,_,R)),
+                 cauda_de(Modo, R, C) ),
+            Classes),
     ( Classes == [] -> Acc = Acc0
     ; maioria(Classes, Ref),
       findall(prob(E, G, rima, M),
-          ( member(G, Pos), nth1(G, Versos, verso(_,_,C)), C \== Ref,
+          ( member(G, Pos), nth1(G, Versos, verso(_,_,R)),
+            cauda_de(Modo, R, C), C \== Ref,
             estrofe_de(Estrofes, G, E, _),
             format(atom(M), "rima '~w' destoa do grupo de rima ~w (os demais rimam em '~w')",
                    [C, Letra, Ref]) ),
@@ -183,39 +210,75 @@ tomar(N, [X | Xs], [X | C], R) :- N > 0, N1 is N - 1, tomar(N1, Xs, C, R).
 
 :- module_transparent exemplo_diag/2.
 
+% Fixture convention: each verse uses rima(ConsAtom, AssoAtom).
+% Sonnets and the broken-villanelle fixtures exercise consonant rhyme,
+% so the same stub goes in both slots.  The cordel sextilha fixtures
+% deliberately disagree in the cons slot to prove the toante check
+% ignores it.
+%
+% Convenção de fixture: cada verso usa rima(AtomCons, AtomToa).
+% Sonetos e a vilanela quebrada testam rima consoante, então repete-se
+% o mesmo stub nos dois slots.  As fixtures do cordel sextilha usam
+% stubs consoantes divergentes para provar que o modo toante os ignora.
+
 % Soneto italiano CORRETO
 exemplo_diag(soneto_ok, poema([
-    verso("verso 1",  [10], ar),  verso("verso 2",  [10], ento),
-    verso("verso 3",  [10], ento), verso("verso 4",  [10], ar),
-    verso("verso 5",  [10], ar),  verso("verso 6",  [10], ento),
-    verso("verso 7",  [10], ento), verso("verso 8",  [10], ar),
-    verso("verso 9",  [10], ia),  verso("verso 10", [10], or),
-    verso("verso 11", [10], ia),  verso("verso 12", [10], or),
-    verso("verso 13", [10], ia),  verso("verso 14", [10], or)
+    verso("verso 1",  [10], rima(ar,   ar)),   verso("verso 2",  [10], rima(ento, ento)),
+    verso("verso 3",  [10], rima(ento, ento)), verso("verso 4",  [10], rima(ar,   ar)),
+    verso("verso 5",  [10], rima(ar,   ar)),   verso("verso 6",  [10], rima(ento, ento)),
+    verso("verso 7",  [10], rima(ento, ento)), verso("verso 8",  [10], rima(ar,   ar)),
+    verso("verso 9",  [10], rima(ia,   ia)),   verso("verso 10", [10], rima(or,   or)),
+    verso("verso 11", [10], rima(ia,   ia)),   verso("verso 12", [10], rima(or,   or)),
+    verso("verso 13", [10], rima(ia,   ia)),   verso("verso 14", [10], rima(or,   or))
 ])).
 
 % Soneto com DOIS erros: rima no v4 e métrica no v7
 exemplo_diag(soneto_com_erros, poema([
-    verso("verso 1",  [10], ar),  verso("verso 2",  [10], ento),
-    verso("verso 3",  [10], ento), verso("verso 4 (rima errada)", [10], os),
-    verso("verso 5",  [10], ar),  verso("verso 6",  [10], ento),
-    verso("verso 7 (curto)", [7], ento),
-    verso("verso 8",  [10], ar),
-    verso("verso 9",  [10], ia),  verso("verso 10", [10], or),
-    verso("verso 11", [10], ia),  verso("verso 12", [10], or),
-    verso("verso 13", [10], ia),  verso("verso 14", [10], or)
+    verso("verso 1",  [10], rima(ar,   ar)),   verso("verso 2",  [10], rima(ento, ento)),
+    verso("verso 3",  [10], rima(ento, ento)),
+    verso("verso 4 (rima errada)", [10], rima(os, os)),
+    verso("verso 5",  [10], rima(ar,   ar)),   verso("verso 6",  [10], rima(ento, ento)),
+    verso("verso 7 (curto)", [7], rima(ento, ento)),
+    verso("verso 8",  [10], rima(ar,   ar)),
+    verso("verso 9",  [10], rima(ia,   ia)),   verso("verso 10", [10], rima(or,   or)),
+    verso("verso 11", [10], rima(ia,   ia)),   verso("verso 12", [10], rima(or,   or)),
+    verso("verso 13", [10], rima(ia,   ia)),   verso("verso 14", [10], rima(or,   or))
 ])).
 
 % Vilanela com REFRÃO quebrado no v18
 exemplo_diag(vilanela_quebrada, poema(V)) :-
-    A1  = verso("Nao entres docil nessa noite",  [10], a),
-    A1x = verso("Verso trocado no lugar errado",  [10], a),
-    A2  = verso("Esbraveja ao morrer da luz",     [10], a),
-    M   = verso("verso do meio (rima b)",         [10], b),
-    X   = verso("verso comum (rima a)",           [10], a),
+    A1  = verso("Nao entres docil nessa noite",  [10], rima(a, a)),
+    A1x = verso("Verso trocado no lugar errado", [10], rima(a, a)),
+    A2  = verso("Esbraveja ao morrer da luz",    [10], rima(a, a)),
+    M   = verso("verso do meio (rima b)",        [10], rima(b, b)),
+    X   = verso("verso comum (rima a)",          [10], rima(a, a)),
     V = [A1, M, A2,
          X,  M, A1,
          X,  M, A2,
          X,  M, A1,
          X,  M, A2,
          X,  M, A1x, A2].
+
+% Cordel sextilha CORRETO: v2/v4/v6 compartilham a vogal 'a', restantes
+% têm vogais distintas entre si.  Caudas consoantes propositalmente
+% diferentes — só o modo toante valida.
+exemplo_diag(cordel_toante_ok, poema([
+    verso("v1", [7], rima(im,   i)),
+    verso("v2", [7], rima(ar,   a)),
+    verso("v3", [7], rima(or,   o)),
+    verso("v4", [7], rima(az,   a)),
+    verso("v5", [7], rima(eu,   e)),
+    verso("v6", [7], rima(ato,  a))
+])).
+
+% Cordel sextilha QUEBRADA: v4 troca a vogal 'a' por 'u'.  As outras
+% duas posições da letra 'b' (v2, v6) continuam em 'a', formando
+% maioria clara — o outlier no v4 deve ser apontado.
+exemplo_diag(cordel_toante_outlier_v4, poema([
+    verso("v1", [7], rima(im,   i)),
+    verso("v2", [7], rima(ar,   a)),
+    verso("v3", [7], rima(or,   o)),
+    verso("v4", [7], rima(uz,   u)),
+    verso("v5", [7], rima(eu,   e)),
+    verso("v6", [7], rima(ato,  a))
+])).
