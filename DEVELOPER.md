@@ -70,6 +70,13 @@ graph TD
   * **Rima Consoante**: Vogais E consoantes são comparadas (ex: *calma* `/ˈkawmɐ/` e *alma* `/ˈawmɐ/`).
   * **Rima Toante (Assonante)**: Apenas as vogais são comparadas (ex: *casa* e *cama* possuem a mesma sequência de vogais `[a, a]`).
 
+#### Selecting the rhyme mode per form / Selecionando o modo por forma
+* Every verse is annotated by `pipeline.verso_ln/2` with **both** tails: `verso(Text, Sils, rima(ConsonantTail, AssonantTail))`. The validator picks the right slot based on the form's rhyme scheme:
+  * Bare list (`[a,b,a,b]`) → consonant comparison (strict; sonnets, decima, trova).
+  * `toante([a,b,a,b])` wrapper → assonant comparison (popular tradition; quadra, cordel sextilha).
+* This lets the same poem be validated against a strict and a popular form without recomputing phonetics.
+* Cada verso é anotado pelo `pipeline.verso_ln/2` com **as duas** caudas: `verso(Texto, Sils, rima(CaudaConsoante, CaudaToante))`. O validador escolhe o slot pelo esquema da forma — lista nua dispara comparação consoante; `toante([...])` dispara comparação toante. Isso permite revalidar o mesmo poema contra diferentes formas sem refazer a fonética.
+
 ---
 
 ## 3. Rule Module Directory / Guia dos Módulos de Regras

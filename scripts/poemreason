@@ -133,14 +133,18 @@ def analyze_poem(poem_data, output_format, html_output=None, stdout_analysis=Tru
         tmp.write(":- use_module(library(http/json)).\n")
         tmp.close()
 
-        # Build goal: extract features for each verse and output JSON (compact, one per line)
+        # Build goal: extract features for each verse and output JSON (compact, one per line).
+        # ln/4's 4th slot is rima(ConsTail, AssoTail); the table column shows the
+        # consonant tail by convention, so we destructure rima(Cons, _) and atomize
+        # the phoneme list into a JSON-friendly atom.
         goal = (
             f"Estrofes = {stanzas_prolog}, "
             f"forall(member(Est, Estrofes), "
             f"  forall(member(Txt, Est), "
-            f"    (verso_ln(Txt, ln(_, IPA, Cont, Classe)), "
+            f"    (verso_ln(Txt, ln(_, IPA, Cont, rima(Cons, _))), "
+            f"     atomic_list_concat(Cons, RimaAtom), "
             f"     json_write_dict(current_output, "
-            f"       _{{verso: Txt, ipa: IPA, silabas: Cont, rima: Classe}}, "
+            f"       _{{verso: Txt, ipa: IPA, silabas: Cont, rima: RimaAtom}}, "
             f"       [width(0)]), nl))), "
             f"halt"
         )

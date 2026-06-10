@@ -213,7 +213,7 @@ Run `scripts/check_env.sh` to verify all required tools are installed.
 It detects the OS (macOS/Linux/Windows) and prints install commands for any missing tool.
 
 ## Common tasks
-- **Add a poetic form**: add a `forma/4` clause in `rules/structural_validator.pl`, then a test in `tests/structural_tests.pl`.
+- **Add a poetic form**: add a `forma/4` clause in `rules/structural_validator.pl`, then a test in `tests/structural_tests.pl`. The rhyme scheme is either a bare list `[a,b,a,b]` (consonant matching, default — strict forms) or `toante([a,b,a,b])` (assonant matching — popular tradition, e.g. quadra, cordel sextilha). The same wrapper convention applies to `forma_estr/4` in `rules/diagnostics.pl`.
 - **Add G2P rules**: edit `rules/g2p.pl`, run `tests/g2p_tests.pl`.
 - **Debug**: use `trace, GOAL` in an interactive session (`swipl rules/pipeline.pl`).
 - **Analyze a poem from text**:
