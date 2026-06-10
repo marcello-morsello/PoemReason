@@ -1,0 +1,73 @@
+#!/usr/bin/env bash
+# scripts/git_hooks/commit-msg — agent commit attribution.
+#
+# Automatically credits AI agents on commits via two trailers:
+#   Agent: <name>                     (machine-readable, greppable)
+#   Co-Authored-By: <Display> <email> (rendered by GitHub)
+#
+# The git Author field keeps crediting the human at the keyboard.
+# Plain-terminal commits with no detected agent pass through unchanged.
+#
+# Detection priority:
+#   1. $AGENT_ID  explicit override (any string), e.g. AGENT_ID=cursor git commit ...
+#   2. Claude Code: $CLAUDECODE or $CLAUDE_CODE_ENTRYPOINT
+#   3. Antigravity: $TERM_PROGRAM=antigravity-ide or any $ANTIGRAVITY_*
+#   4. Codex CLI:   $CODEX_HOME or any $CODEX_*
+#   5. (none)       pass through
+#
+# To register a new agent: add a case to detect_agent() and
+# resolve_display().  Emails follow the "Morsello & AI Sons" pattern:
+#   <agent>.ai@morsello.net
+
+set -eu
+
+MSG_FILE="$1"
+
+detect_agent() {
+    if [ "${AGENT_ID:-}" != "" ]; then
+        echo "$AGENT_ID"
+        return
+    fi
+    if [ "${CLAUDECODE:-}" != "" ] || [ "${CLAUDE_CODE_ENTRYPOINT:-}" != "" ]; then
+        echo "claude"
+        return
+    fi
+    if [ "${TERM_PROGRAM:-}" = "antigravity-ide" ] || env | grep -qE "^ANTIGRAVITY_"; then
+        echo "antigravity"
+        return
+    fi
+    if [ "${CODEX_HOME:-}" != "" ] || env | grep -qE "^CODEX_"; then
+        echo "codex"
+        return
+    fi
+    echo ""
+}
+
+resolve_display() {
+    case "$1" in
+        claude)      echo "Claude Code|claude.ai@morsello.net" ;;
+        antigravity) echo "Antigravity|antigravity.ai@morsello.net" ;;
+        codex)       echo "Codex|codex.ai@morsello.net" ;;
+        *)           echo "$1|$1.ai@morsello.net" ;;
+    esac
+}
+
+agent="$(detect_agent)"
+[ -z "$agent" ] && exit 0
+
+# Idempotent: if the exact Agent: trailer is already present, do nothing.
+if grep -qE "^Agent: ${agent}\$" "$MSG_FILE"; then
+    exit 0
+fi
+
+display_email="$(resolve_display "$agent")"
+display="${display_email%|*}"
+email="${display_email#*|}"
+
+# git interpret-trailers handles the blank-line separator and avoids
+# duplicating trailers that match exactly.
+git interpret-trailers --in-place \
+    --if-exists addIfDifferent \
+    --trailer "Agent: $agent" \
+    --trailer "Co-Authored-By: $display <$email>" \
+    "$MSG_FILE"
