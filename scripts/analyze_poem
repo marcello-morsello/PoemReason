@@ -102,11 +102,14 @@ def analyze_verses(stanzas):
         tmp.write(":- use_module(library(http/json)).\n")
         tmp.close()
 
+        # ln/4's 4th slot is rima(ConsTail, AssoTail); the JSON column 'rima'
+        # carries the consonant tail by convention, atomised for JSON.
         goal = (
             f"forall(member(Txt, [{verse_terms}]), "
-            f"  (verso_ln(Txt, ln(_, IPA, Cont, Classe)), "
+            f"  (verso_ln(Txt, ln(_, IPA, Cont, rima(Cons, _))), "
+            f"   atomic_list_concat(Cons, RimaAtom), "
             f"   json_write_dict(current_output, "
-            f"     _{{verso: Txt, ipa: IPA, silabas: Cont, rima: Classe}}, "
+            f"     _{{verso: Txt, ipa: IPA, silabas: Cont, rima: RimaAtom}}, "
             f"     [width(0)]), nl)), halt"
         )
 
@@ -148,9 +151,10 @@ def validate_stanza(stanza_verses, stanza_num):
         # Build verso/3 from text; convert rhyme list to atom for structural matching
         goal = (
             f"Txts = [{verse_terms}], "
-            f"maplist([T,verso(T,Cont,ClAtom)]>>("
-            f"  verso_ln(T, ln(_, _, Cont, Cl)), "
-            f"  atomic_list_concat(Cl, ClAtom)), Txts, Vs), "
+            f"maplist([T,verso(T,Cont,rima(ConsAtom,AssoAtom))]>>("
+            f"  verso_ln(T, ln(_, _, Cont, rima(Cons, Asso))), "
+            f"  atomic_list_concat(Cons, ConsAtom), "
+            f"  atomic_list_concat(Asso, AssoAtom)), Txts, Vs), "
             f"findall(F, (structural_validator:forma(F,_,_,_), F \\= verso_branco, once(structural_validator:valida(F, poema(Vs)))), Fs0), "
             f"sort(Fs0, Fs), "
             f"json_write_dict(current_output, "
@@ -198,9 +202,10 @@ def validate_whole_poem(stanzas):
 
         goal = (
             f"Txts = [{verse_terms}], "
-            f"maplist([T,verso(T,Cont,ClAtom)]>>("
-            f"  verso_ln(T, ln(_, _, Cont, Cl)), "
-            f"  atomic_list_concat(Cl, ClAtom)), Txts, Vs), "
+            f"maplist([T,verso(T,Cont,rima(ConsAtom,AssoAtom))]>>("
+            f"  verso_ln(T, ln(_, _, Cont, rima(Cons, Asso))), "
+            f"  atomic_list_concat(Cons, ConsAtom), "
+            f"  atomic_list_concat(Asso, AssoAtom)), Txts, Vs), "
             f"findall(F, (structural_validator:forma(F,_,_,_), F \\= verso_branco, once(structural_validator:valida(F, poema(Vs)))), Fs0), "
             f"sort(Fs0, Fs), "
             f"json_write_dict(current_output, "

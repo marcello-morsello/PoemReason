@@ -24,10 +24,10 @@
 
 %! gera_html(+File, +Title, +Form, +Lang, +Stanzas) is det.
 %  Writes an HTML report to File.  Stanzas is a list of lists of
-%  ln(Text, IPA, Syllables, RhymeClass).
+%  ln(Text, IPA, Syllables, rima(ConsonantTail, AssonantTail)).
 %
 %  Escreve um relatório HTML em File.  Stanzas é uma lista de listas
-%  de ln(Texto, IPA, Silabas, ClasseDeRima).
+%  de ln(Texto, IPA, Silabas, rima(CaudaConsoante, CaudaToante)).
 gera_html(Arquivo, Titulo, Forma, Lang, Estrofes) :-
     aplaina(Estrofes, Versos),
     diagnostica(Forma, poema(Versos), Probs),
@@ -39,7 +39,9 @@ gera_html(Arquivo, Titulo, Forma, Lang, Estrofes) :-
           emite_fundo(S) ),
         close(S)).
 
-% ln(Text,IPA,Syl,Class) -> verso(Text,Syl,Class)
+% ln(Text, IPA, Syl, rima(C,A)) -> verso(Text, Syl, rima(C,A))
+% The rhyme compound is passed straight through; diagnostica/3 picks
+% the consonant or assonant slot based on the form's mode.
 aplaina(Estrofes, Versos) :-
     findall(verso(T, Sil, C),
             ( member(Est, Estrofes), member(ln(T,_,Sil,C), Est) ),
