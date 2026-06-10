@@ -111,10 +111,13 @@ cat poem.txt | ./poemreason --html report.html
 ### Run tests
 
 ```bash
-# List available test suites
+# Run all unit tests
+./scripts/test_all.sh
+
+# List available test suites via Python CLI
 ./poemreason --example
 
-# Run a specific test suite
+# Run a specific test suite via Python CLI
 ./poemreason --example g2p
 ./poemreason --example structural
 ```

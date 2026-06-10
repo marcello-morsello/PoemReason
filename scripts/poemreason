@@ -260,6 +260,64 @@ def run_example(test_name):
     sys.exit(rc)
 
 
+def classify_prose(text_data):
+    """Check if the parsed text is prose and classify it.
+    
+    Returns a dict with details if prose, otherwise None.
+    """
+    stanzas = text_data.get("stanzas", [])
+    flat_lines = [line.strip() for stanza in stanzas for line in stanza if line.strip()]
+    if not flat_lines:
+        return None
+
+    total_words = sum(len(line.split()) for line in flat_lines)
+    total_lines = len(flat_lines)
+    if total_lines == 0:
+        return None
+
+    avg_words_per_line = total_words / total_lines
+    max_words_in_line = max(len(line.split()) for line in flat_lines)
+
+    # Heuristic: if avg words > 13 or max words > 25, it's prose.
+    is_prose = avg_words_per_line > 13 or max_words_in_line > 25
+    if not is_prose:
+        return None
+
+    if total_words < 150:
+        genre = "Microconto (Micro-story)"
+    elif total_words < 2000:
+        genre = "Crônica"
+    elif total_words < 7500:
+        genre = "Conto (Short Story)"
+    elif total_words < 40000:
+        genre = "Novela (Novella)"
+    else:
+        genre = "Romance (Novel)"
+
+    return {
+        "genre": genre,
+        "word_count": total_words,
+        "line_count": total_lines,
+        "avg_words_per_line": avg_words_per_line,
+        "max_words_in_line": max_words_in_line
+    }
+
+
+def print_prose_report(info, output_format):
+    """Print the prose classification report and exit."""
+    if output_format == "json":
+        print(json.dumps({"type": "prose", "classification": info}, indent=2))
+    else:
+        print("Text classified as Prose / Texto classificado como Prosa.")
+        print(f"Genre / Gênero: {info['genre']}")
+        print(f"Word Count / Palavras: {info['word_count']}")
+        print(f"Line Count / Linhas: {info['line_count']}")
+        print(f"Average words per line / Média de palavras por linha: {info['avg_words_per_line']:.2f}")
+        print(f"Maximum words in a line / Máximo de palavras em uma linha: {info['max_words_in_line']}")
+        print("\nPoetic scansion and rhyme validation are skipped for prose.")
+        print("A escansão poética e a validação de rimas são ignoradas para prosa.")
+
+
 def main():
     parser = argparse.ArgumentParser(
         prog="poemreason",
@@ -289,6 +347,12 @@ def main():
         default="json",
         help="Output format (default: json).",
     )
+    parser.add_argument(
+        "--max-stanzas", "-m",
+        type=int,
+        default=12,
+        help="Maximum number of stanzas to analyze for long poems (default: 12). Use 0 for no limit.",
+    )
 
     args = parser.parse_args()
 
@@ -299,15 +363,35 @@ def main():
 
     if args.example is not False:
         run_example(args.example)
-    elif args.input:
+        return
+
+    # Load poem data
+    if args.input:
         poem = parse_poem_input(args.input)
-        analyze_poem(poem, args.format, args.html, stdout_analysis)
     elif not sys.stdin.isatty():
         poem = parse_poem_input("-")
-        analyze_poem(poem, args.format, args.html, stdout_analysis)
     else:
         parser.print_help()
         sys.exit(1)
+
+    # Check for prose
+    prose_info = classify_prose(poem)
+    if prose_info:
+        print_prose_report(prose_info, args.format)
+        sys.exit(0)
+
+    # Truncate stanzas for long poems
+    stanzas = poem.get("stanzas", [])
+    original_stanzas_count = len(stanzas)
+    if args.max_stanzas > 0 and original_stanzas_count > args.max_stanzas:
+        poem["stanzas"] = stanzas[:args.max_stanzas]
+        print(
+            f"Warning: The poem has {original_stanzas_count} stanzas. Analyzing the first {args.max_stanzas} stanzas.\n"
+            f"Aviso: O poema tem {original_stanzas_count} estrofes. Analisando as primeiras {args.max_stanzas} estrofes.\n",
+            file=sys.stderr
+        )
+
+    analyze_poem(poem, args.format, args.html, stdout_analysis)
 
 
 if __name__ == "__main__":

@@ -85,7 +85,11 @@ swipl -q -s rules/structural_validator.pl \
 - Tests live in `tests/` with `_tests.pl` suffix.
 - Use direct assertion style: `test(name) :- predicate(expected_args).`
 - Add a determinism test with `forall` + `once/1` for predicates marked `is det`.
-- Always run tests before committing:
+- Always run the full test suite before committing:
+  ```bash
+  ./scripts/test_all.sh
+  ```
+- To run individual test suites manually:
   ```bash
   swipl -q -s tests/g2p_tests.pl -g "run_tests, halt" -t "halt(1)"
   swipl -q -s tests/phonetic_tests.pl -g "run_tests, halt" -t "halt(1)"
@@ -137,10 +141,11 @@ available, open the PR via the URL printed by `git push`
 
 ## Verification before a PR
 
-Before opening a PR, run the full test suite listed under
-**Conventions > Testing** above (`run_tests, halt` across `g2p_tests.pl`,
-`phonetic_tests.pl`, `structural_tests.pl`, `diagnostics_tests.pl`,
-`pipeline_tests.pl`). All must report `passed`.
+Before opening a PR, run the full test suite via:
+```bash
+./scripts/test_all.sh
+```
+All tests must report `passed`.
 
 When the change touches the CLI or the pipeline, also run a sanity
 analysis end-to-end:

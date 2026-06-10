@@ -41,11 +41,13 @@ forma_estr(cancao, [4,4], livre,
 %  Coleta todos os problemas de estrutura/métrica/rima.
 diagnostica(Nome, poema(Versos), Probs) :-
     forma_estr(Nome, Estrofes, Metrica, Rima),
-    checa_estrutura(Estrofes, Versos,           P0),
-    checa_metrica(Metrica,    Versos, Estrofes, P1),
-    checa_rima(Rima,          Versos, Estrofes, P2),
-    extra_diag(Nome,          Versos, Estrofes, P3),
-    append([P0,P1,P2,P3], Probs).
+    checa_estrutura(Estrofes, Versos, P0),
+    ( P0 \== []
+      -> Probs = P0  % Short-circuit: skip metrics and rhyme checks if line count is wrong
+      ;  checa_metrica(Metrica,    Versos, Estrofes, P1),
+         checa_rima(Rima,          Versos, Estrofes, P2),
+         extra_diag(Nome,          Versos, Estrofes, P3),
+         append([P0,P1,P2,P3], Probs) ).
 
 % ---- structure: total verse count ----------------------------
 checa_estrutura(Estrofes, Versos, Probs) :-
