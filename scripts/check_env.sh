@@ -122,6 +122,21 @@ else
     echo "OK  git hooks  (set core.hooksPath -> $HOOKS_PATH)"
 fi
 
+# ---- git alias: ai-commit ----------------------------------------
+# Register 'git ai-commit' as a wrapper that sets OPENCODE=1 so the
+# commit-msg hook auto-detects DeepSeek and stamps the attribution
+# trailers.  Uses the script from scripts/ for clarity.
+AI_COMMIT_SCRIPT="$SCRIPT_DIR/git-commit-ai"
+if [ -x "$AI_COMMIT_SCRIPT" ]; then
+    CURRENT_ALIAS="$(git config --local core.aliases.ai-commit 2>/dev/null || true)"
+    if [ "$CURRENT_ALIAS" != "!$AI_COMMIT_SCRIPT" ]; then
+        git -C "$PROJECT_ROOT" config alias.ai-commit "!$AI_COMMIT_SCRIPT"
+        echo "OK  git alias  (ai-commit -> OPENCODE=1 git commit)"
+    else
+        echo "OK  git alias  (ai-commit already set)"
+    fi
+fi
+
 echo "---"
 if [ "$missing" -gt 0 ]; then
     echo "$missing item(s) missing. Install them and re-run this script."

@@ -1,0 +1,68 @@
+#!/usr/bin/env bash
+# scripts/git-commit-ai — git commit wrapper for AI-assisted commits.
+#
+# Auto-detects the AI agent from the environment (or accepts -a <name>)
+# and sets AGENT_ID so the commit-msg hook stamps the correct
+# Agent: + Co-Authored-By: trailers.
+#
+# Usage:  ./scripts/git-commit-ai -m "message"
+#         ./scripts/git-commit-ai -a claude -m "message"
+#         ./scripts/git-commit-ai -a deepseek -m "message"
+#
+# All non-flag arguments are forwarded verbatim to git commit.
+# Use -- to separate flags for this wrapper from git commit flags:
+#   ./scripts/git-commit-ai -a codex -- --no-verify -m "msg"
+#
+# Detection order (same as the commit-msg hook):
+#   -a     explicit override (any string)
+#   deepseek   if $OPENCODE or $OPENCODE_* is set
+#   claude     if $CLAUDECODE or $CLAUDE_CODE_ENTRYPOINT is set
+#   antigravity if $TERM_PROGRAM=antigravity-ide or $ANTIGRAVITY_* set
+#   codex      if $CODEX_HOME or $CODEX_* is set
+set -eu
+
+detect_agent() {
+    if [ "${CLAUDECODE:-}" != "" ] || [ "${CLAUDE_CODE_ENTRYPOINT:-}" != "" ]; then
+        echo "claude"
+        return
+    fi
+    if [ "${TERM_PROGRAM:-}" = "antigravity-ide" ] || env | grep -qE "^ANTIGRAVITY_"; then
+        echo "antigravity"
+        return
+    fi
+    if [ "${CODEX_HOME:-}" != "" ] || env | grep -qE "^CODEX_"; then
+        echo "codex"
+        return
+    fi
+    if [ "${OPENCODE:-}" != "" ] || env | grep -qE "^OPENCODE_"; then
+        echo "deepseek"
+        return
+    fi
+    echo ""
+}
+
+agent=""
+# Scan only for -a <name> as the sole wrapper flag; everything else
+# passes through verbatim to git commit (including -m, --trailer, etc.).
+if [ "${1:-}" = "-a" ] && [ -n "${2:-}" ]; then
+    agent="$2"
+    shift 2
+fi
+
+if [ -z "$agent" ]; then
+    agent="$(detect_agent)"
+fi
+
+if [ -z "$agent" ]; then
+    echo "Usage: git-commit-ai [-a AGENT] [git-commit-flags...]" >&2
+    echo "" >&2
+    echo "No AI agent detected in the environment and no -a flag given." >&2
+    echo "Known agents: claude, antigravity, codex, deepseek" >&2
+    echo "Explicit:  git-commit-ai -a claude -m \"message\"" >&2
+    echo "Detected:  runs inside an AI sandbox (auto-detects)" >&2
+    echo "Plain:     git commit ... (no attribution trailers)" >&2
+    exit 1
+fi
+
+export AGENT_ID="$agent"
+exec git commit "$@"

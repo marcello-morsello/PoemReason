@@ -1,0 +1,120 @@
+#!/usr/bin/env zsh
+# clau -- claude-keep. Wraps `claude` so accidental Ctrl-C cannot lose the session.
+#
+# Behavior:
+#   - On launch: if a prior Claude session exists for the current cwd, start with
+#     `claude --continue` (auto-resume). Otherwise start fresh.
+#   - On any claude exit (/exit, /quit, Ctrl-D, double Ctrl-C, crash): wrapper
+#     PROMPTS before quitting. Press Enter (or anything but 'q') to resume the
+#     same session with `claude --continue`. Type 'q' (or 'quit') + Enter to
+#     actually exit the wrapper.
+#   - The wrapper itself catches INT/TERM/QUIT/HUP/TSTP with a no-op handler --
+#     it never dies on signals. Force-quit only via `kill -9 <PID>`.
+#
+# State file (visibility / external scripts):
+#   ${XDG_STATE_HOME:-~/.local/state}/clau/<slug>.session
+#     -- contains the UUID of the latest session for the cwd.
+#     The actual conversation history lives in Claude's own session jsonl files.
+#
+# Why prompt instead of suppressing Ctrl-C entirely:
+#   Claude Code (Node + Ink) reads Ctrl-C as a raw input byte, not as SIGINT,
+#   so SIG_IGN inheritance via exec doesn't shield it. We can't prevent claude
+#   from exiting on double Ctrl-C without intercepting the input stream.
+#   The prompt-on-exit pattern guarantees no accidental loss -- you have to
+#   explicitly type 'q' to quit.
+
+# Colored tag (sky-blue #00afff via ANSI 256 -- matches the starship palette).
+# Falls back to plain "[clau]" if stdout isn't a TTY (e.g. logged to file).
+if [[ -t 1 ]]; then
+  _TAG=$'\e[38;5;39m[clau]\e[0m '       # sky-blue tag, trailing space
+  _Q=$'\e[1;38;5;220m'                   # bold + warm yellow for the question
+  _R=$'\e[0m'                            # reset
+else
+  _TAG="[clau] "
+  _Q=""
+  _R=""
+fi
+
+_clau_warn() {
+  print -u2 ""
+  print -u2 "${_TAG}signal absorbed by wrapper. If claude exits, you'll get a restart prompt."
+}
+trap _clau_warn INT TERM QUIT HUP TSTP
+
+# Export CLAUDECODE so the project's commit-msg hook (scripts/git_hooks/)
+# assigns commits made inside claude to "Agent: claude" instead of
+# inheriting whatever env var the parent shell set (e.g. $OPENCODE).
+export CLAUDECODE=1
+
+# --- helpers ----------------------------------------------------------------
+
+_state_dir="${XDG_STATE_HOME:-$HOME/.local/state}/clau"
+mkdir -p "$_state_dir"
+
+_proj_slug()    { print -- "${PWD//[^a-zA-Z0-9]/-}"; }
+_sessions_dir() { print -- "$HOME/.claude/projects/$(_proj_slug)"; }
+_state_file()   { print -- "$_state_dir/$(_proj_slug).session"; }
+
+_latest_session() {
+  local d=$(_sessions_dir)
+  [[ -d "$d" ]] || return 0
+  local f=$(ls -t "$d"/*.jsonl 2>/dev/null | head -1)
+  [[ -n "$f" ]] && print -- "${f:t:r}"   # basename without extension
+}
+
+_latest_session_mtime() {
+  local d=$(_sessions_dir)
+  [[ -d "$d" ]] || return 0
+  local f=$(ls -t "$d"/*.jsonl 2>/dev/null | head -1)
+  [[ -n "$f" ]] && date -r "$f" "+%Y-%m-%d %H:%M:%S"
+}
+
+_record_latest() {
+  local sid=$(_latest_session)
+  [[ -n "$sid" ]] && print -- "$sid" > "$(_state_file)"
+}
+
+# --- main -------------------------------------------------------------------
+
+print "${_TAG}wrapper PID=$$  -- force-quit: kill -9 $$"
+print "${_TAG}state file:  $(_state_file)"
+
+sid_at_start=$(_latest_session)
+if [[ -n "$sid_at_start" ]]; then
+  print "${_TAG}prior session for this cwd:"
+  print "${_TAG}  id:           $sid_at_start"
+  print "${_TAG}  last activity: $(_latest_session_mtime)"
+  print -n "${_TAG}${_Q}Do you want to (C)ontinue, (F)resh session or e(X)it ? [Cfx] =>${_R} "
+  read -r ans || ans=""
+  case "${ans:l}" in
+    x|exit|q|quit) print "${_TAG}Bye."; exit 0 ;;
+    f|fresh|n)     ( trap - INT TERM QUIT HUP TSTP; exec claude "$@" ) ;;
+    c|""|*)        ( trap - INT TERM QUIT HUP TSTP; exec claude --continue "$@" ) ;;
+  esac
+else
+  print "${_TAG}no prior session in $PWD -- starting fresh"
+  ( trap - INT TERM QUIT HUP TSTP; exec claude "$@" )
+fi
+ec=$?
+_record_latest
+
+while true; do
+  print ""
+  print "${_TAG}-------- claude exited (code=$ec) --------"
+  print "${_TAG}session id:    $(_latest_session)"
+  print "${_TAG}last activity: $(_latest_session_mtime)"
+  print -n "${_TAG}${_Q}Do you want to (c)ontinue or e(X)it ? [cX] =>${_R} "
+  read -r ans || ans=""
+  case "${ans:l}" in
+    c|continue)
+      ;;
+    x|exit|q|quit|""|*)
+      print "${_TAG}Bye."
+      exit 0
+      ;;
+  esac
+  print "${_TAG}resuming with --continue..."
+  ( trap - INT TERM QUIT HUP TSTP; exec claude --continue )
+  ec=$?
+  _record_latest
+done

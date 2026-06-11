@@ -51,6 +51,7 @@ Currently registered:
 | Claude Code (Anthropic) | `Agent: claude` | `Claude Code <claude.ai@morsello.net>` |
 | Antigravity (Google)    | `Agent: antigravity` | `Antigravity <antigravity.ai@morsello.net>` |
 | Codex (OpenAI)          | `Agent: codex` | `Codex <codex.ai@morsello.net>` |
+| DeepSeek / opencode     | `Agent: deepseek` | `DeepSeek <deepseek.ai@morsello.net>` |
 
 ### Per-human forks / Fork por humano
 
@@ -81,6 +82,7 @@ Detection is by environment variable:
 - Claude Code → `$CLAUDECODE` or `$CLAUDE_CODE_ENTRYPOINT`
 - Antigravity → `$TERM_PROGRAM=antigravity-ide` or any `$ANTIGRAVITY_*`
 - Codex CLI → `$CODEX_HOME` or any `$CODEX_*`
+- opencode (DeepSeek) → `$OPENCODE` or any `$OPENCODE_*`
 - Manual override: `AGENT_ID=<name> git commit ...`
 
 The hook is **idempotent** (re-running doesn't duplicate trailers)
@@ -96,6 +98,36 @@ once after every fresh clone:
 ```bash
 ./scripts/check_env.sh
 ```
+
+### Convenience wrapper / Atalho: `git ai-commit`
+
+A wrapper script at `scripts/git-commit-ai` (also available as the git alias
+`git ai-commit`) sets the right environment variable so the hook stamps
+attribution trailers automatically.  It is **agent-agnostic** — pass the agent
+name via `-a <name>`.
+
+Um script auxiliar em `scripts/git-commit-ai` (também disponível como alias
+`git ai-commit`) define a variável de ambiente correta para que o hook
+carimbe os trailers de atribuição automaticamente.  É **agnóstico de agente** —
+passe o nome do agente via `-a <nome>`.
+
+```bash
+# Auto-detect (works inside an AI sandbox with known env vars):
+git ai-commit -m "feat: add new form"
+
+# Explicit agent override:
+git ai-commit -a deepseek -m "feat: add new form"
+git ai-commit -a claude -m "feat: add new form"
+git ai-commit -a codex -m "feat: add new form"
+git ai-commit -a antigravity -m "feat: add new form"
+
+# Plain git commit — no trailers (human-only):
+git commit -m "feat: add new form"
+```
+
+The alias is registered by `scripts/check_env.sh` (idempotent, run once).
+
+O alias é registrado pelo `scripts/check_env.sh` (idempotente, execute uma vez).
 
 ### Multi-agent commits / Commits multi-agente
 
@@ -123,8 +155,17 @@ atribuição é política do projeto, não etiqueta.
 ### Searching / Buscas
 
 ```bash
+# Tudo que o DeepSeek tocou:
+git log --grep "Agent: deepseek"
+
 # Tudo que o Claude tocou:
 git log --grep "Agent: claude"
+
+# Tudo que o Codex tocou:
+git log --grep "Agent: codex"
+
+# Tudo que o Antigravity tocou:
+git log --grep "Agent: antigravity"
 
 # Tudo que envolveu qualquer agente de IA:
 git log --grep "\.ai@morsello.net"
@@ -238,9 +279,10 @@ Division of labor:
   listed under **Testing** above) — anything that is **not** git. Does
   not execute `git commit` / `git push` / `gh` on this mount; instead,
   leaves changes ready and describes the suggested commit/PR.
-- **Commit + PR**: done from a native user terminal or by Claude Code
-  running locally, following the branch protection rules already
-  documented under **Environment > Branch protection (`main`)**.
+- **Native terminal**: run `git ai-commit` (or `AGENT_ID=<name> git commit`)
+  from a native terminal to stamp the correct attribution trailers.
+- **Claude Code**: can also run locally, following the same branch protection
+  rules documented under **Environment > Branch protection (`main`)**.
 
 If a commit wedges with a stuck `.git/*.lock`, clean it from a native
 terminal: `rm -f .git/*.lock`.

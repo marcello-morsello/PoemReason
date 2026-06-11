@@ -13,7 +13,8 @@
 #   2. Claude Code: $CLAUDECODE or $CLAUDE_CODE_ENTRYPOINT
 #   3. Antigravity: $TERM_PROGRAM=antigravity-ide or any $ANTIGRAVITY_*
 #   4. Codex CLI:   $CODEX_HOME or any $CODEX_*
-#   5. (none)       pass through
+#   5. opencode (DeepSeek): $OPENCODE or any $OPENCODE_*
+#   6. (none)       pass through
 #
 # To register a new agent: add a case to detect_agent() and
 # resolve_display().  Emails follow the "Morsello & AI Sons" pattern:
@@ -40,6 +41,10 @@ detect_agent() {
         echo "codex"
         return
     fi
+    if [ "${OPENCODE:-}" != "" ] || env | grep -qE "^OPENCODE_"; then
+        echo "deepseek"
+        return
+    fi
     echo ""
 }
 
@@ -48,6 +53,7 @@ resolve_display() {
         claude)      echo "Claude Code|claude.ai@morsello.net" ;;
         antigravity) echo "Antigravity|antigravity.ai@morsello.net" ;;
         codex)       echo "Codex|codex.ai@morsello.net" ;;
+        deepseek)    echo "DeepSeek|deepseek.ai@morsello.net" ;;
         *)           echo "$1|$1.ai@morsello.net" ;;
     esac
 }
