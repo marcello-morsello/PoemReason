@@ -1,6 +1,6 @@
 :- encoding(utf8).
 :- use_module('../rules/pipeline').
-:- use_module('../rules/phonetic_validator', [contagens/3, cauda_consoante/2]).
+:- use_module('../rules/pt/phonetics', [contagens/3, cauda_consoante/2]).
 :- use_module(library(plunit)).
 
 % ============================================================

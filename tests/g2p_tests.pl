@@ -1,5 +1,5 @@
 :- encoding(utf8).
-:- use_module('../rules/g2p').
+:- use_module('../rules/pt/g2p').
 :- use_module(library(plunit)).
 
 % ============================================================

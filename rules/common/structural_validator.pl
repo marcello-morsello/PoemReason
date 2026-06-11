@@ -6,6 +6,7 @@
     exemplo/2
 ]).
 :- encoding(utf8).
+:- multifile forma/4.
 % ============================================================
 %  structural_validator.pl — Structural poetry form validator
 %

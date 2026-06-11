@@ -1,5 +1,5 @@
 :- encoding(utf8).
-:- use_module('../rules/structural_validator').
+:- use_module('../rules/common/structural_validator').
 :- use_module(library(plunit)).
 
 % ============================================================

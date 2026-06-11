@@ -1,4 +1,4 @@
-:- module(phonetic_validator, [
+:- module(phonetics, [
     escande/3,
     soma_moras/2,
     contagens/3,
@@ -8,14 +8,21 @@
     rima_toante/2,
     forma_fon/4,
     valida_fon/2,
+    tradicao_padrao/1,
     exemplo_pt/2,
     exemplo_haiku/1
 ]).
 :- encoding(utf8).
 % ============================================================
-%  phonetic_validator.pl — Multilingual phonetic versification engine
+%  phonetics.pl — Portuguese phonetic versification engine
 %
-%  Núcleo multilíngue de escansão e rima fonética.
+%  Motor de escansão e rima fonética para o português.
+%
+%  It exports tradicao_padrao/1 so the generic core.pl can
+%  discover the default scansion tradition without hardcoding.
+%
+%  Exporta tradicao_padrao/1 para que o core.pl genérico
+%  descubra a tradição de escansão sem hardcoding.
 %
 %  Uses the enriched sil/5 representation from the G2P layer.
 %  Each tradition picks the phonetic trait it needs:
@@ -49,6 +56,9 @@ permite_sinalefa(portugues_silabico).
 
 % Quem conta só até a última tônica (resto pós-tônico não conta):
 conta_ate_tonica(portugues_silabico).
+
+% Tradição padrão para core.pl descobrir sem hardcoding:
+tradicao_padrao(portugues_silabico).
 
 
 % ============================================================

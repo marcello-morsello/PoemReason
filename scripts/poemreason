@@ -4,32 +4,15 @@
 import argparse
 import json
 import os
-import subprocess
 import sys
-import tempfile
 
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-PROJECT_ROOT = os.path.dirname(SCRIPT_DIR)
-RULES_DIR = os.path.join(PROJECT_ROOT, "rules")
-TESTS_DIR = os.path.join(PROJECT_ROOT, "tests")
-TMP_DIR = os.path.join(PROJECT_ROOT, "tmp")
-
-
-def find_swipl():
-    """Locate the swipl binary."""
-    from shutil import which
-    path = which("swipl")
-    if not path:
-        print("Error: swipl not found. Install SWI-Prolog first.", file=sys.stderr)
-        sys.exit(1)
-    return path
-
-
-def run_swipl(args, cwd=None):
-    """Run swipl with given args, return (stdout, stderr, returncode)."""
-    cmd = [find_swipl()] + args
-    result = subprocess.run(cmd, capture_output=True, text=True, cwd=cwd or RULES_DIR)
-    return result.stdout, result.stderr, result.returncode
+from prolog_bridge import (
+    PROJECT_ROOT,
+    TESTS_DIR,
+    build_loader,
+    run_swipl,
+    find_swipl,
+)
 
 
 def parse_poem_input(source):
@@ -110,7 +93,7 @@ def build_stanzas_prolog(stanzas):
     return "[" + ", ".join(stanza_terms) + "]"
 
 
-def analyze_poem(poem_data, output_format, html_output=None, stdout_analysis=True):
+def analyze_poem(lang, poem_data, output_format, html_output=None, stdout_analysis=True):
     """Analyze a poem using the Prolog pipeline."""
     title = poem_data.get("title", "Untitled")
     form = poem_data.get("form", "cancao")
@@ -119,29 +102,24 @@ def analyze_poem(poem_data, output_format, html_output=None, stdout_analysis=Tru
 
     # If only HTML requested, skip stdout analysis
     if html_output and not stdout_analysis:
-        generate_html(poem_data, html_output)
+        generate_html(lang, poem_data, html_output)
         return
 
-    tmp = None
+    loader = build_loader(lang)
+    tmp_path = None
+    import tempfile
     try:
-        tmp = tempfile.NamedTemporaryFile(
-            mode="w", suffix=".pl", dir=TMP_DIR, prefix="analyze_", delete=False
-        )
-        tmp.write(":- encoding(utf8).\n")
-        tmp.write(":- use_module(pipeline).\n")
-        tmp.write(":- use_module(phonetic_validator, [contagens/3, cauda_consoante/2]).\n")
-        tmp.write(":- use_module(library(http/json)).\n")
-        tmp.close()
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".pl", prefix="analyze_", delete=False
+        ) as f:
+            tmp_path = f.name
+            f.write(loader)
 
-        # Build goal: extract features for each verse and output JSON (compact, one per line).
-        # ln/4's 4th slot is rima(ConsTail, AssoTail); the table column shows the
-        # consonant tail by convention, so we destructure rima(Cons, _) and atomize
-        # the phoneme list into a JSON-friendly atom.
         goal = (
             f"Estrofes = {stanzas_prolog}, "
             f"forall(member(Est, Estrofes), "
             f"  forall(member(Txt, Est), "
-            f"    (verso_ln(Txt, ln(_, IPA, Cont, rima(Cons, _))), "
+            f"    (core:verso_ln(Txt, ln(_, IPA, Cont, rima(Cons, _))), "
             f"     atomic_list_concat(Cons, RimaAtom), "
             f"     json_write_dict(current_output, "
             f"       _{{verso: Txt, ipa: IPA, silabas: Cont, rima: RimaAtom}}, "
@@ -150,11 +128,11 @@ def analyze_poem(poem_data, output_format, html_output=None, stdout_analysis=Tru
         )
 
         stdout, stderr, rc = run_swipl(
-            ["-q", "-s", tmp.name, "-g", goal, "-t", "halt(1)"]
+            ["-q", "-s", tmp_path, "-g", goal, "-t", "halt(1)"]
         )
     finally:
-        if tmp:
-            os.unlink(tmp.name)
+        if tmp_path:
+            os.unlink(tmp_path)
 
     if rc != 0:
         print(f"Prolog error:\n{stderr}", file=sys.stderr)
@@ -167,7 +145,7 @@ def analyze_poem(poem_data, output_format, html_output=None, stdout_analysis=Tru
 
     # Generate HTML if requested
     if html_output:
-        generate_html(poem_data, html_output)
+        generate_html(lang, poem_data, html_output)
 
 
 def print_table(json_lines, title, form):
@@ -192,7 +170,7 @@ def print_table(json_lines, title, form):
         print(f"{verso:<40} {sil:<12} {rima:<12} {ipa}")
 
 
-def generate_html(poem_data, output_path):
+def generate_html(lang, poem_data, output_path):
     """Generate an HTML report via the Prolog pipeline."""
     title = poem_data.get("title", "Untitled")
     form = poem_data.get("form", "cancao")
@@ -206,25 +184,26 @@ def generate_html(poem_data, output_path):
 
     abs_output = os.path.abspath(output_path)
 
-    tmp = None
+    loader = build_loader(lang)
+    tmp_path = None
+    import tempfile
     try:
-        tmp = tempfile.NamedTemporaryFile(
-            mode="w", suffix=".pl", dir=TMP_DIR, prefix="html_", delete=False
-        )
-        tmp.write(":- encoding(utf8).\n")
-        tmp.write(":- use_module(pipeline).\n")
-        tmp.close()
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".pl", prefix="html_", delete=False
+        ) as f:
+            tmp_path = f.name
+            f.write(loader)
 
         goal = (
-            f'gera_de_texto("{abs_output}", "{title}", {form}, {stanzas_prolog}), halt'
+            f'core:gera_de_texto("{abs_output}", "{title}", {form}, {stanzas_prolog}), halt'
         )
 
         stdout, stderr, rc = run_swipl(
-            ["-q", "-s", tmp.name, "-g", goal, "-t", "halt(1)"]
+            ["-q", "-s", tmp_path, "-g", goal, "-t", "halt(1)"]
         )
     finally:
-        if tmp:
-            os.unlink(tmp.name)
+        if tmp_path:
+            os.unlink(tmp_path)
 
     if rc != 0:
         print(f"HTML generation error:\n{stderr}", file=sys.stderr)
@@ -333,6 +312,12 @@ def main():
         help="Input file (JSON, YAML, or plain text). Use '-' for stdin.",
     )
     parser.add_argument(
+        "--lang", "-l",
+        default="pt",
+        choices=["pt", "ja", "es", "it", "fr"],
+        help="Poem language (default: pt).",
+    )
+    parser.add_argument(
         "--html",
         metavar="FILE",
         help="Generate an HTML report to the specified file.",
@@ -361,7 +346,6 @@ def main():
     args = parser.parse_args()
 
     # Show stdout analysis unless --html is the only output requested
-    # (i.e., user didn't explicitly ask for -f table or -f json)
     explicit_format = any(a in sys.argv for a in ["-f", "--format"])
     stdout_analysis = explicit_format or not args.html
 
@@ -395,7 +379,7 @@ def main():
             file=sys.stderr
         )
 
-    analyze_poem(poem, args.format, args.html, stdout_analysis)
+    analyze_poem(args.lang, poem, args.format, args.html, stdout_analysis)
 
 
 if __name__ == "__main__":

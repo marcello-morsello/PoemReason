@@ -5,6 +5,7 @@
     estrofe_de/4
 ]).
 :- encoding(utf8).
+:- multifile forma_estr/4.
 % ============================================================
 %  diagnostics.pl — Reporting layer for structural validation
 %

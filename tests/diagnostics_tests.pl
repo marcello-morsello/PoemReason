@@ -1,5 +1,5 @@
 :- encoding(utf8).
-:- use_module('../rules/diagnostics').
+:- use_module('../rules/common/diagnostics').
 :- use_module(library(plunit)).
 
 % ============================================================

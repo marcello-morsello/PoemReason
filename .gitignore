@@ -1,10 +1,24 @@
-# Dropbox sync artifacts
+# Cloud sync artifacts — Dropbox, OneDrive, Google Drive
 .dropbox
 .dropbox.attr
 .dropbox.cache
 *.conflicted copy*
 *(conflited copy*
 *(cópia em conflito*
+desktop.ini
+.lock
+~$*
+*-OneDrive-Conflict-*
+.tmp.drivedownload
+.tmp.driveupload
+*.gdoc
+*.gsheet
+*.gslides
+*.gdraw
+*.gform
+*.gtable
+*.gmap
+*.gsite
 
 # macOS
 .DS_Store

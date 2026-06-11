@@ -1,5 +1,5 @@
 :- encoding(utf8).
-:- use_module('../rules/phonetic_validator').
+:- use_module('../rules/pt/phonetics').
 :- use_module(library(plunit)).
 
 % ============================================================
