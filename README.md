@@ -2,11 +2,11 @@
 
 A poetry validation engine powered by [SWI-Prolog](https://www.swi-prolog.org/).
 Analyzes verse structure, scansion (syllable/mora counting), rhyme schemes,
-and poetic forms — from haiku to sonnets.
+and poetic forms — from haiku to sonnets, across 8 languages.
 
 Um motor de validação de poesia em [SWI-Prolog](https://www.swi-prolog.org/).
 Analisa estrutura de versos, escansão (contagem silábica/moraica), esquemas
-de rima e formas poéticas — do haiku ao soneto.
+de rima e formas poéticas — do haiku ao soneto, em 8 idiomas.
 
 ## Prerequisites
 
@@ -27,28 +27,37 @@ python3 -m venv .venv
 ## Project structure
 
 ```
-poemreason              CLI entry point (shell wrapper)
+poemreason                     CLI entry point (shell wrapper)
 scripts/
-├── poemreason          Python CLI (called by wrapper)
-├── poem_to_yaml.py     Poem serializer (YAML + Prolog facts)
-└── check_env.sh        Environment check (git, swipl, gh, python3, venv, pip)
+├── poemreason                 Python CLI (--lang pt|ja|it|fr|en|de|es)
+├── prolog_bridge.py           Shared utilities for SWI-Prolog subprocess
+├── analyze_poem               Legacy .md poem analyzer
+├── check_env.sh               Environment check (git, swipl, gh, python)
+├── git-commit-ai              AI commit wrapper (agent attribution)
+├── git_hooks/
+│   └── commit-msg             Auto-stamps Agent:/Co-Authored-By: trailers
+└── test_all.sh                Runs all test suites across languages
 rules/
-├── g2p.pl              Grapheme-to-phoneme (Brazilian Portuguese)
-├── phonetic_validator.pl  Scansion engine + rhyme (multilingual: PT syllabic, JP moraic)
-├── structural_validator.pl  Structural form validation (haiku → sestina)
-├── diagnostics.pl      Reporting layer (collects violations by stanza/verse)
-├── html_report.pl      Interactive HTML report generator (links to static/)
-└── pipeline.pl         End-to-end orchestration: text → G2P → validation → HTML
+├── common/                     Language-agnostic shared modules
+│   ├── core.pl                 Orchestration (linha_sils, verso_ln, gera_de_texto)
+│   ├── structural_validator.pl  Form catalog + valida/identifica/diagnostico
+│   ├── diagnostics.pl           Per-stanza error collection + reporting
+│   └── html_report.pl           Interactive HTML report (TTS, IPA)
+├── pt/  (Português)            g2p.pl + phonetics.pl + pipeline.pl
+├── ja/  (日本語)                g2p.pl + phonetics.pl + pipeline.pl
+├── it/  (Italiano)             g2p.pl + phonetics.pl + pipeline.pl
+├── fr/  (Français)             g2p.pl + phonetics.pl + pipeline.pl
+├── en/  (English)              g2p.pl + phonetics.pl + pipeline.pl
+├── de/  (Deutsch)              g2p.pl + phonetics.pl + pipeline.pl
+└── es/  (Español)              g2p.pl + phonetics.pl + pipeline.pl
 static/
-├── style.css           Editorial stylesheet (cream paper, sepia ink)
-└── script.js           Web Speech API vocalizer (TTS)
+├── style.css                   Editorial stylesheet (cream paper, sepia ink)
+└── script.js                   Web Speech API vocalizer (TTS)
 tests/
-├── g2p_tests.pl        G2P unit tests (25 words)
-├── phonetic_tests.pl   Scansion, mora, rhyme, form tests
-├── structural_tests.pl Structural form tests (haiku, trova, villanelle, sestina)
-├── diagnostics_tests.pl  Diagnostic report tests (sonnet, villanelle)
-└── pipeline_tests.pl   End-to-end pipeline tests
-requirements.txt        Python dependencies (pyyaml)
+├── g2p_tests.pl / phonetic_tests.pl / structural_tests.pl / ...
+├── it_g2p_tests.pl / fr_g2p_tests.pl / en_g2p_tests.pl / ...
+├── de_g2p_tests.pl / es_g2p_tests.pl
+└── pipeline_tests.pl
 ```
 
 ## Architecture / Arquitetura
@@ -57,86 +66,117 @@ The engine is organized in four layers:
 
 O motor é organizado em quatro camadas:
 
-| Layer / Camada | Module / Módulo | Role / Papel |
+| Layer / Camada | Modules / Módulos | Role / Papel |
 |---|---|---|
-| 1 — Phonetics / Fonética | `g2p.pl` | Grapheme-to-phoneme: word → `sil/5` structures + IPA |
-| 2a — Phonetic versification / Versificação fonética | `phonetic_validator.pl` | Scansion (escansão), synaloepha (sinalefa), rhyme extraction |
-| 2b — Structural versification / Versificação estrutural | `structural_validator.pl` | Form catalog, metric/rhyme/constraint validation |
-| 3 — Reporting / Relatório | `diagnostics.pl` + `html_report.pl` | Error collection + interactive HTML output |
-| 4 — Pipeline / Orquestração | `pipeline.pl` | Raw text → full analysis → HTML |
+| 1 — G2P | `rules/{lang}/g2p.pl` | Grapheme-to-phoneme: word → `sil/5` + IPA |
+| 2a — Scansion | `rules/{lang}/phonetics.pl` | Syllable/mora count, synaloepha, rhyme extraction |
+| 2b — Forms | `rules/common/structural_validator.pl` | Form catalog + metric/rhyme validation |
+| 3 — Reporting | `rules/common/diagnostics.pl` + `html_report.pl` | Error collection + HTML output |
+| 4 — Pipeline | `rules/{lang}/pipeline.pl` + `rules/common/core.pl` | Raw text → full analysis → output |
+
+Each language supplies its own `g2p.pl` (phoneme rules), `phonetics.pl` (scansion tradition),
+and `pipeline.pl` (loader). The `rules/common/` modules are shared across all languages.
+
+Cada idioma fornece seu próprio `g2p.pl` (regras fonêmicas), `phonetics.pl` (tradição de
+escansão) e `pipeline.pl` (carregador). Os módulos em `rules/common/` são compartilhados.
+
+### Per-language dispatch / Despacho por idioma
+
+The CLI flag `--lang` (default: `pt`) selects which language module to load:
+
+```prolog
+% Generated loader (rules/{lang}/g2p + phonetics + common/* + core)
+:- use_module(rules/pt/g2p).
+:- use_module(rules/pt/phonetics).
+:- use_module(rules/common/structural_validator).
+:- use_module(rules/common/diagnostics).
+:- use_module(rules/common/html_report).
+:- use_module(rules/common/core).
+```
 
 ### Supported forms / Formas suportadas
 
-Haiku, tanka, trova, quadra, limerick, cordel (sextilha), décima, soneto italiano,
-soneto inglês, vilanela, sextina, verso branco.
+| Language / Idioma | Local forms / Formas locais |
+|---|---|
+| PT — Português | trova, quadra, cordel_sextilha, décima, sonetos |
+| JA — 日本語 | chōka, sedōka, bussokusekika, katauta, dodoitsu |
+| IT — Italiano | terza rima, ottava rima, madrigale |
+| FR — Français | sonnet_fr, ballade, triolet, rondeau, pantoum |
+| EN — English | blank_verse, heroic_couplet, common_metre, rhyme_royal, spenserian_stanza |
+| DE — Deutsch | knittelvers, blankvers, volksliedstrophe, alexandriner, distichon |
+| ES — Español | seguidilla, redondilla, cuarteta, copla, lira, décima espinela, octava real, cuaderna vía, silva |
 
-### Multilingual / Multilíngue
+Shared forms across all languages: soneto_italiano, soneto_ingles, limerick, vilanela, sextina, verso_branco.
 
-The `sil/5` representation supports both syllabic traditions (Portuguese — counts
-syllables, cuts at last stress) and moraic traditions (Japanese — counts moras).
-Each tradition uses exactly the trait the other discards: weight (duration) for
-haiku; accent (stress) for decasyllable.
+### Multilingual scansion / Escansão multilíngue
 
-A representação `sil/5` suporta tanto tradições silábicas (português — conta
-sílabas, corta na última tônica) quanto tradições moraicas (japonês — conta moras).
+The `sil/5` representation supports multiple traditions:
+- **Syllabic** (PT, ES, IT, FR): counts syllables, cuts at last stress, optional synaloepha
+- **Moraic** (JA): counts moras (weight units), no stress cut, no synaloepha
+- **Accentual-syllabic** (EN, DE): counts syllables, no stress cut (all syllables count)
+
+A representação `sil/5` suporta múltiplas tradições:
+- **Silábica** (PT, ES, IT, FR): conta sílabas, corta na última tônica, sinalefa opcional
+- **Moraica** (JA): conta moras (unidades de peso), sem corte, sem sinalefa
+- **Acentual-silábica** (EN, DE): conta sílabas, sem corte (todas as sílabas contam)
 
 ## CLI usage
 
-The `poemreason` wrapper at the project root auto-detects `.venv` and runs the Python CLI.
-
-### Analyze a poem from plain text
-
 ```bash
-# Stanzas separated by blank lines
-cat <<EOF | ./poemreason -f table
-Eu sinto um grande amor
-que sopra como o vento
-e cura toda a dor
-num passo doce e lento
-EOF
-```
+# Portuguese (default)
+echo "Velha lagoa quieta" | ./poemreason -f table
 
-### Analyze from JSON/YAML
+# Japanese
+echo "ふるいけや かわずとびこむ みずのおと" | ./poemreason -l ja -f table
 
-```bash
-echo '{"title":"Minha Trova","form":"trova","stanzas":[["Eu sinto um grande amor","que sopra como o vento","e cura toda a dor","num passo doce e lento"]]}' | ./poemreason
-```
+# Italian
+echo "Nel mezzo del cammin di nostra vita" | ./poemreason -l it -f table
 
-### Generate HTML report
+# French
+echo "Je suis le ténébreux" | ./poemreason -l fr -f table
 
-```bash
+# English
+echo "Shall I compare thee to a summer's day" | ./poemreason -l en -f table
+
+# German
+echo "Der Mond ist aufgegangen" | ./poemreason -l de -f table
+
+# Spanish
+echo "En un lugar de la Mancha" | ./poemreason -l es -f table
+
+# Generate HTML report
 cat poem.txt | ./poemreason --html report.html
+
+# JSON output (default)
+echo "Verso de exemplo" | ./poemreason
 ```
 
 ### Run tests
 
 ```bash
-# Run all unit tests
-./scripts/test_all.sh
-
-# List available test suites via Python CLI
-./poemreason --example
-
-# Run a specific test suite via Python CLI
-./poemreason --example g2p
-./poemreason --example structural
+./scripts/test_all.sh          # All 116 tests across all languages
+./poemreason --example         # List available test suites
+./poemreason --example pt_g2p  # Run a specific suite
 ```
 
 ### Direct Prolog queries
 
 ```bash
-# G2P for a single word
-swipl -q -s rules/g2p.pl -g "g2p(casa, _, IPA), format('~w~n', [IPA]), halt"
+# Portuguese G2P
+swipl -q -s rules/pt/pipeline.pl -g "g2p:g2p(casa, _, IPA), writeln(IPA), halt"
+
+# Japanese scansion
+swipl -q -s rules/ja/pipeline.pl -g "core:verso_ln('ふるいけや', L), writeln(L), halt"
 
 # Validate a structural form
-swipl -q -s rules/structural_validator.pl \
-  -g "exemplo(minha_trova, P), valida(trova, P), writeln(ok), halt" \
-  -t "halt(1)"
+swipl -q -s rules/common/structural_validator.pl \
+  -g "exemplo(minha_trova, P), valida(trova, P), writeln(ok), halt"
 ```
 
 ## Contributing
 
-All changes to `main` must go through a Pull Request. See [CLAUDE.md](CLAUDE.md) for coding conventions.
+All changes to `main` must go through a Pull Request.
+See [AGENTS.md](AGENTS.md) for coding conventions and commit attribution policies.
 
 ## License
 

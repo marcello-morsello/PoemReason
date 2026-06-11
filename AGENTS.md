@@ -178,24 +178,35 @@ git log --format='%h | %an | %(trailers:key=Agent,valueonly,separator=%x2C )'
 Use SWI-Prolog in non-interactive mode:
 
 ```bash
-swipl -q -s rules/pipeline.pl -g "GOAL, halt" -t "halt(1)"
+swipl -q -s rules/{lang}/pipeline.pl -g "GOAL, halt" -t "halt(1)"
 ```
 
 - `-q`: suppress banner
-- `-s FILE`: load file
+- `-s FILE`: load file (language-specific pipeline or common module)
 - `-g GOAL`: execute goal and exit
 - `-t "halt(1)"`: exit code ≠ 0 on failure
 
-Example — G2P for a single word:
+Example — Portuguese G2P for a single word:
 ```bash
-swipl -q -s rules/g2p.pl -g "g2p(casa, _, IPA), format('~w~n', [IPA]), halt" -t "halt(1)"
+swipl -q -s rules/pt/pipeline.pl -g "g2p:g2p(casa, _, IPA), format('~w~n', [IPA]), halt" -t "halt(1)"
+```
+
+Example — Japanese scansion for a verse:
+```bash
+swipl -q -s rules/ja/pipeline.pl -g "core:verso_ln('ふるいけや', L), writeln(L), halt" -t "halt(1)"
 ```
 
 Example — validate a poetic form:
 ```bash
-swipl -q -s rules/structural_validator.pl \
+swipl -q -s rules/common/structural_validator.pl \
   -g "exemplo(minha_trova, P), valida(trova, P), writeln(ok), halt" \
   -t "halt(1)"
+```
+
+Example — diagnose a poem:
+```bash
+swipl -q -s rules/common/diagnostics.pl -g "exemplo_diag(soneto_ok, P),
+  diagnostica(soneto_italiano, P, Probs), writeln(Probs), halt" -t "halt(1)"
 ```
 
 ## Language Rules
@@ -247,6 +258,11 @@ swipl -q -s rules/structural_validator.pl \
   swipl -q -s tests/structural_tests.pl -g "run_tests, halt" -t "halt(1)"
   swipl -q -s tests/diagnostics_tests.pl -g "run_tests, halt" -t "halt(1)"
   swipl -q -s tests/pipeline_tests.pl -g "run_tests, halt" -t "halt(1)"
+  swipl -q -s tests/it_g2p_tests.pl -g "run_tests, halt" -t "halt(1)"
+  swipl -q -s tests/fr_g2p_tests.pl -g "run_tests, halt" -t "halt(1)"
+  swipl -q -s tests/en_g2p_tests.pl -g "run_tests, halt" -t "halt(1)"
+  swipl -q -s tests/de_g2p_tests.pl -g "run_tests, halt" -t "halt(1)"
+  swipl -q -s tests/es_g2p_tests.pl -g "run_tests, halt" -t "halt(1)"
   ```
 
 ## Environment check
@@ -254,12 +270,19 @@ Run `scripts/check_env.sh` to verify all required tools are installed.
 It detects the OS (macOS/Linux/Windows) and prints install commands for any missing tool.
 
 ## Common tasks
-- **Add a poetic form**: add a `forma/4` clause in `rules/structural_validator.pl`, then a test in `tests/structural_tests.pl`. The rhyme scheme is either a bare list `[a,b,a,b]` (consonant matching, default — strict forms) or `toante([a,b,a,b])` (assonant matching — popular tradition, e.g. quadra, cordel sextilha). The same wrapper convention applies to `forma_estr/4` in `rules/diagnostics.pl`.
-- **Add G2P rules**: edit `rules/g2p.pl`, run `tests/g2p_tests.pl`.
-- **Debug**: use `trace, GOAL` in an interactive session (`swipl rules/pipeline.pl`).
+- **Add a poetic form**: add a `forma/4` clause via `multifile` in the target language's `phonetics.pl`, then a test in `tests/structural_tests.pl` (or language-specific test). Shared forms go in `rules/common/structural_validator.pl`. The rhyme scheme is either a bare list `[a,b,a,b]` (consonant matching, default — strict forms), `toante([a,b,a,b])` (assonant matching — popular tradition), or `toante([-,a,-,a])` (assonant on even verses, odd free).
+- **Add G2P rules**: edit `rules/{lang}/g2p.pl`, run the corresponding test suite.
+- **Add a new language**: create `rules/{lang}/g2p.pl`, `phonetics.pl`, `pipeline.pl`. Register forms via `multifile structural_validator:forma/4`. Add to `scripts/poemreason --lang` choices.
+- **Debug**: use `trace, GOAL` in an interactive session (`swipl rules/pt/pipeline.pl`).
 - **Analyze a poem from text**:
   ```bash
-  echo "Velha lagoa quieta" | ./poemreason -f table
+  echo "Velha lagoa quieta" | ./poemreason -f table        # default: PT
+  echo "ふるいけや" | ./poemreason -l ja -f table            # Japanese
+  echo "Nel mezzo" | ./poemreason -l it -f table             # Italian
+  echo "Je suis" | ./poemreason -l fr -f table               # French
+  echo "Shall I" | ./poemreason -l en -f table               # English
+  echo "Der Mond" | ./poemreason -l de -f table              # German
+  echo "En un lugar" | ./poemreason -l es -f table           # Spanish
   ```
 - **Generate HTML report**:
   ```bash
