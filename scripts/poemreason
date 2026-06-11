@@ -314,7 +314,7 @@ def main():
     parser.add_argument(
         "--lang", "-l",
         default="pt",
-        choices=["pt", "ja", "es", "it", "fr"],
+        choices=["pt", "ja", "es", "it", "fr", "en", "de"],
         help="Poem language (default: pt).",
     )
     parser.add_argument(
