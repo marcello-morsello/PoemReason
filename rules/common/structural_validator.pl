@@ -115,7 +115,8 @@ sons(Versos, Sons) :- sons_cons(Versos, Sons).
 
 mesma_particao(Modelo, Sons) :-
     length(Modelo, N), length(Sons, N),
-    forall( ( nth1(I, Modelo, Mi), nth1(J, Modelo, Mj), I < J ),
+    forall( ( nth1(I, Modelo, Mi), Mi \== (-),      % skip free-verse placeholder
+              nth1(J, Modelo, Mj), Mj \== (-), I < J ),
             ( nth1(I, Sons, Si), nth1(J, Sons, Sj),
               ( Mi == Mj -> Si == Sj ; Si \== Sj ) ) ).
 

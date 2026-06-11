@@ -25,6 +25,7 @@ TEST_FILES=(
     "tests/fr_g2p_tests.pl"
     "tests/en_g2p_tests.pl"
     "tests/de_g2p_tests.pl"
+    "tests/es_g2p_tests.pl"
 )
 
 failed=0
