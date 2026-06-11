@@ -26,9 +26,20 @@ TEST_FILES=(
     "tests/en_g2p_tests.pl"
     "tests/de_g2p_tests.pl"
     "tests/es_g2p_tests.pl"
+    "tests/html_report_tests.pl"
 )
 
 failed=0
+
+echo "Running / Executando: pytest (Python CLI)..."
+cd "$PROJECT_ROOT"
+if ! .venv/bin/pytest -q tests/test_cli.py 2>&1; then
+    echo "FAIL / FALHA: pytest"
+    failed=1
+else
+    echo "PASS / PASSOU: pytest"
+fi
+echo "----------------------------------------"
 
 for test_file in "${TEST_FILES[@]}"; do
     full_path="$PROJECT_ROOT/$test_file"
