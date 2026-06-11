@@ -23,6 +23,8 @@ TEST_FILES=(
     "tests/pipeline_tests.pl"
     "tests/it_g2p_tests.pl"
     "tests/fr_g2p_tests.pl"
+    "tests/en_g2p_tests.pl"
+    "tests/de_g2p_tests.pl"
 )
 
 failed=0
