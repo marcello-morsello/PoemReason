@@ -115,6 +115,13 @@ Nota: Poemas japoneses contêm kanji; para testar no CLI use apenas kana.
 
 ---
 
+## Future languages / Línguas futuras
+
+| Language | Forms |
+|---|---|
+| Ελληνικά (Greek) | Ίαμβος, τροχαίος, δακτυλικός (ancient meters) |
+| Latina (Latin) | Hexameter, pentameter, sapphic stanza |
+
 ## Missing examples / Exemplos pendentes
 
 | Form | Language | Suggested poem |

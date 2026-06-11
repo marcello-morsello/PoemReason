@@ -27,6 +27,13 @@ TEST_FILES=(
     "tests/de_g2p_tests.pl"
     "tests/es_g2p_tests.pl"
     "tests/html_report_tests.pl"
+    "tests/validate_pt.pl"
+    "tests/validate_ja.pl"
+    "tests/validate_it.pl"
+    "tests/validate_fr.pl"
+    "tests/validate_en.pl"
+    "tests/validate_de.pl"
+    "tests/validate_es.pl"
 )
 
 failed=0
