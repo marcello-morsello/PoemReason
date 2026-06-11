@@ -37,6 +37,7 @@ Poemas de exemplo organizados por idioma para testar o motor PoemReason.
 |---|---|---|
 | `camões_1595_sobolos-rios.md` | Luís de Camões | canção / ode |
 | `goncalves-dias_1843_cancao-do-exilio.md` | Gonçalves Dias | quadra / canção |
+| `leandro-gomes-de-barros_1918_o-dinheiro.md` | Leandro Gomes de Barros | cordel_sextilha |
 | `bilac_1888_via-lactea-xiii.md` | Olavo Bilac | soneto_italiano |
 | `augusto-dos-anjos_1912_versos-intimos.md` | Augusto dos Anjos | soneto_italiano |
 
