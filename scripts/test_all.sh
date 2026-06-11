@@ -21,6 +21,7 @@ TEST_FILES=(
     "tests/structural_tests.pl"
     "tests/diagnostics_tests.pl"
     "tests/pipeline_tests.pl"
+    "tests/it_g2p_tests.pl"
 )
 
 failed=0
