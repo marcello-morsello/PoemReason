@@ -20,12 +20,10 @@ Que tais não encontro eu cá;
 Em cismar — sozinho, à noite —
 Mais prazer encontro eu lá;
 
-Se eu tenho de morrer na terra,
-Que eu nasci na, que Deus me deu,
 Não permita Deus que eu morra,
 Sem que eu volte para lá;
-
 Sem que desfrute os primores
 Que não encontro por cá;
+
 Sem qu'inda aviste as palmeiras,
 Onde canta o Sabiá.

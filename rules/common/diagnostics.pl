@@ -224,26 +224,46 @@ tomar(N, [X | Xs], [X | C], R) :- N > 0, N1 is N - 1, tomar(N1, Xs, C, R).
 
 % Soneto italiano CORRETO
 exemplo_diag(soneto_ok, poema([
-    verso("verso 1",  [10], rima(ar,   ar)),   verso("verso 2",  [10], rima(ento, ento)),
-    verso("verso 3",  [10], rima(ento, ento)), verso("verso 4",  [10], rima(ar,   ar)),
-    verso("verso 5",  [10], rima(ar,   ar)),   verso("verso 6",  [10], rima(ento, ento)),
-    verso("verso 7",  [10], rima(ento, ento)), verso("verso 8",  [10], rima(ar,   ar)),
-    verso("verso 9",  [10], rima(ia,   ia)),   verso("verso 10", [10], rima(or,   or)),
-    verso("verso 11", [10], rima(ia,   ia)),   verso("verso 12", [10], rima(or,   or)),
-    verso("verso 13", [10], rima(ia,   ia)),   verso("verso 14", [10], rima(or,   or))
+    % Quarteto 1
+    verso("verso 1",  [10], rima(ar,   ar)),
+    verso("verso 2",  [10], rima(ento, ento)),
+    verso("verso 3",  [10], rima(ento, ento)),
+    verso("verso 4",  [10], rima(ar,   ar)),
+    % Quarteto 2
+    verso("verso 5",  [10], rima(ar,   ar)),
+    verso("verso 6",  [10], rima(ento, ento)),
+    verso("verso 7",  [10], rima(ento, ento)),
+    verso("verso 8",  [10], rima(ar,   ar)),
+    % Terceiro 1
+    verso("verso 9",  [10], rima(ia,   ia)),
+    verso("verso 10", [10], rima(or,   or)),
+    verso("verso 11", [10], rima(ia,   ia)),
+    % Terceiro 2
+    verso("verso 12", [10], rima(or,   or)),
+    verso("verso 13", [10], rima(ia,   ia)),
+    verso("verso 14", [10], rima(or,   or))
 ])).
 
 % Soneto com DOIS erros: rima no v4 e métrica no v7
 exemplo_diag(soneto_com_erros, poema([
-    verso("verso 1",  [10], rima(ar,   ar)),   verso("verso 2",  [10], rima(ento, ento)),
+    % Quarteto 1
+    verso("verso 1",  [10], rima(ar,   ar)),
+    verso("verso 2",  [10], rima(ento, ento)),
     verso("verso 3",  [10], rima(ento, ento)),
     verso("verso 4 (rima errada)", [10], rima(os, os)),
-    verso("verso 5",  [10], rima(ar,   ar)),   verso("verso 6",  [10], rima(ento, ento)),
+    % Quarteto 2
+    verso("verso 5",  [10], rima(ar,   ar)),
+    verso("verso 6",  [10], rima(ento, ento)),
     verso("verso 7 (curto)", [7], rima(ento, ento)),
     verso("verso 8",  [10], rima(ar,   ar)),
-    verso("verso 9",  [10], rima(ia,   ia)),   verso("verso 10", [10], rima(or,   or)),
-    verso("verso 11", [10], rima(ia,   ia)),   verso("verso 12", [10], rima(or,   or)),
-    verso("verso 13", [10], rima(ia,   ia)),   verso("verso 14", [10], rima(or,   or))
+    % Terceiro 1
+    verso("verso 9",  [10], rima(ia,   ia)),
+    verso("verso 10", [10], rima(or,   or)),
+    verso("verso 11", [10], rima(ia,   ia)),
+    % Terceiro 2
+    verso("verso 12", [10], rima(or,   or)),
+    verso("verso 13", [10], rima(ia,   ia)),
+    verso("verso 14", [10], rima(or,   or))
 ])).
 
 % Vilanela com REFRÃO quebrado no v18
