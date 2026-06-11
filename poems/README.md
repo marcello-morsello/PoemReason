@@ -70,18 +70,23 @@ Poemas de exemplo organizados por idioma para testar o motor PoemReason.
 | `shakespeare_1609_sonnet-18.md` | William Shakespeare | soneto_ingles |
 | `milton_1667_paradise-lost.md` | John Milton | blank_verse |
 | `lear_1846_book-of-nonsense.md` | Edward Lear | limerick |
+| `pope_1711_essay-on-criticism.md` | Alexander Pope | heroic_couplet |
 | `thomas_1951_do-not-go-gentle.md` | Dylan Thomas | vilanela |
 
 ## Deutsch (DE)
 
 | File / Arquivo | Author / Autor | Form / Forma |
 |---|---|---|
-| `goethe_1782_erlkonig.md` | Johann Wolfgang von Goethe | knittelvers |
+| `goethe_1771_heidenroslein.md` | J. W. von Goethe | volksliedstrophe |
+| `goethe_1782_erlkonig.md` | J. W. von Goethe | knittelvers |
+| `gryphius_1636_traenen-des-vaterlandes.md` | Andreas Gryphius | sonett / alexandriner |
 
 ## Español (ES)
 
 | File / Arquivo | Author / Autor | Form / Forma |
 |---|---|---|
+| `garcilaso_1543_flor-de-gnido.md` | Garcilaso de la Vega | lira |
+| `quevedo_1648_mire-los-muros.md` | Francisco de Quevedo | soneto |
 | `marti_1891_cultivo-una-rosa-blanca.md` | José Martí | redondilla |
 
 ---
